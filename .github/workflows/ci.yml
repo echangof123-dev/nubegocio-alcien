@@ -95,7 +95,7 @@ jobs:
             alcien
           for i in $(seq 1 40); do curl -fsS http://127.0.0.1:8090/api/salud && break; sleep 1; done
           docker logs alcien 2>&1 | grep -q "base de datos al día"
-          curl -fsS "http://127.0.0.1:8090/api/tipos-negocio?q=ferreteria" | grep -q "Ferreter"
+          test "$(psql -X -tAc "select count(*) from catalogo.tipo_negocio" -d alcien_docker)" = "216"
           curl -fsS http://127.0.0.1:8090/api/salud
           curl -fsS http://127.0.0.1:8090/ | grep -q "Al Cien"
           # En producción el código de acceso no se devuelve: solo queda en el registro
