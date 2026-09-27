@@ -67,6 +67,9 @@ jobs:
       - name: Pruebas de la API
         run: bash apps/api/scripts/test.sh
 
+      - name: Pruebas de la API sin permiso para crear usuarios (como un PostgreSQL administrado)
+        run: SIN_ROLES=1 PGDATABASE_API=alcien_api_sin_roles bash apps/api/scripts/test.sh
+
       - name: Compilar API y web
         run: npm run build
 

@@ -7,7 +7,9 @@ const cfg = cargarConfig();
 if (cfg.migrar) {
   const { migrar } = await import("./migrar.js");
   const r = await migrar({ ...cfg.migrar, log: (m, e) => log("info", m, e) });
-  log("info", "base de datos al día", { aplicadas: r.aplicadas.length, catalogo: r.seed });
+  log("info", "base de datos al día", { aplicadas: r.aplicadas.length, catalogo: r.seed, sinRoles: r.sinRoles });
+  // Sin permiso para crear usuarios, la API entra con la dueña (para ella la seguridad por fila es obligatoria)
+  if (r.sinRoles) cfg.db = { ...cfg.db, user: cfg.migrar.admin.user, password: cfg.migrar.admin.password ?? "" };
 }
 
 const app = crearApp(cfg);

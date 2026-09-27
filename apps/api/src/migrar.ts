@@ -5,6 +5,13 @@
  *   2. carga el catálogo de db/seed si cambió,
  *   3. crea o actualiza el usuario sin privilegios con el que se conecta la API.
  * Usa la conexión de administrador (dueña de las tablas); la API sigue usando alcien_api.
+ *
+ * "Modo sin roles": si el proveedor no deja crear usuarios (sin CREATEROLE, como algunos
+ * PostgreSQL administrados), la API usa a la dueña de las tablas y el aislamiento entre negocios
+ * se mantiene: la seguridad por fila se vuelve obligatoria también para la dueña (FORCE) y solo
+ * las funciones SECURITY DEFINER pueden ver todos los negocios. Para marcarlas se usa
+ * application_name = 'alcien-sistema' en la propia función: sin superusuario no se pueden fijar
+ * parámetros propios (app.*) en ALTER FUNCTION, y application_name sí.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -19,7 +26,35 @@ export interface OpcionesMigrar {
   log?: (msg: string, extra?: Record<string, unknown>) => void;
 }
 
-export async function migrar(o: OpcionesMigrar): Promise<{ aplicadas: string[]; seed: boolean }> {
+const SQL_SIN_ROLES = `
+do $$
+declare r record;
+begin
+  -- Las políticas dejan pasar solo a las funciones del sistema
+  for r in select schemaname, tablename, policyname, qual, with_check from pg_policies
+           where schemaname = 'app' and policyname = 'aislamiento_negocio' loop
+    if position('alcien-sistema' in r.qual) = 0 then
+      execute format('alter policy %I on %I.%I using ((%s) or current_setting(''application_name'') = ''alcien-sistema'') '
+                     'with check ((%s) or current_setting(''application_name'') = ''alcien-sistema'')',
+                     r.policyname, r.schemaname, r.tablename, r.qual, coalesce(r.with_check, r.qual));
+    end if;
+  end loop;
+  -- El dueño de las tablas también queda sujeto a la seguridad por fila
+  for r in select n.nspname, c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+           where c.relrowsecurity and not c.relforcerowsecurity and n.nspname = 'app' loop
+    execute format('alter table %I.%I force row level security', r.nspname, r.relname);
+  end loop;
+  -- Las funciones SECURITY DEFINER son las únicas que ven todos los negocios
+  for r in select p.oid::regprocedure as f from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where p.prosecdef and n.nspname in ('app', 'auth', 'catalogo')
+             and not coalesce(p.proconfig, '{}') @> array['application_name=alcien-sistema'] loop
+    execute format('alter function %s set application_name = ''alcien-sistema''', r.f);
+  end loop;
+end $$;`;
+
+export interface ResultadoMigrar { aplicadas: string[]; seed: boolean; sinRoles: boolean }
+
+export async function migrar(o: OpcionesMigrar): Promise<ResultadoMigrar> {
   const log = o.log ?? (() => {});
   const c = new ConexionPg({ ...o.admin, applicationName: "alcien-migrar" });
   await c.conectar();
@@ -28,6 +63,15 @@ export async function migrar(o: OpcionesMigrar): Promise<{ aplicadas: string[]; 
     await c.query("select pg_advisory_lock(7272001)");
     await c.simple(`create table if not exists public.schema_migrations (
       version text primary key, aplicada_en timestamptz not null default now())`);
+    const { rows: yo } = await c.query<{ usuario: string; puede: boolean }>(
+      "select current_user as usuario, (rolcreaterole or rolsuper) as puede from pg_roles where rolname = current_user");
+    const duena = yo[0]!.usuario;
+    const sinRoles = !yo[0]!.puede;
+    if (sinRoles && !/^[a-z_][a-z0-9_]*$/.test(duena)) throw new Error(`Nombre de usuario de la base no soportado: ${duena}`);
+    // Sin CREATEROLE, los permisos que las migraciones dan a alcien_app se dan a la dueña (no cambian nada)
+    const adaptar = (sql: string) => (sinRoles ? sql.replace(/\balcien_app\b/g, duena) : sql);
+    if (sinRoles) log("la base no permite crear usuarios: modo sin roles", { usuario: duena });
+
     const { rows } = await c.query<{ version: string }>("select version from public.schema_migrations");
     const hechas = new Set(rows.map((r) => r.version));
 
@@ -37,7 +81,7 @@ export async function migrar(o: OpcionesMigrar): Promise<{ aplicadas: string[]; 
     for (const f of archivos) {
       const version = f.replace(/\.sql$/, "");
       if (hechas.has(version)) continue;
-      const sql = fs.readFileSync(path.join(dirMig, f), "utf8");
+      const sql = adaptar(fs.readFileSync(path.join(dirMig, f), "utf8"));
       await c.simple("BEGIN");
       try {
         await c.simple(sql);
@@ -70,6 +114,12 @@ export async function migrar(o: OpcionesMigrar): Promise<{ aplicadas: string[]; 
       log("catálogo cargado", { marca });
     }
 
+    if (sinRoles) {
+      await c.simple(SQL_SIN_ROLES);
+      await c.query("select pg_advisory_unlock(7272001)");
+      return { aplicadas, seed: seedCargado, sinRoles };
+    }
+
     // Usuario de la API: hereda alcien_app y no se salta la seguridad por fila
     const { rows: existe } = await c.query("select 1 from pg_roles where rolname = $1", [o.usuarioApi]);
     const { rows: sentencia } = await c.query<{ s: string }>(
@@ -80,7 +130,7 @@ export async function migrar(o: OpcionesMigrar): Promise<{ aplicadas: string[]; 
     await c.simple(sentencia[0]!.s);
 
     await c.query("select pg_advisory_unlock(7272001)");
-    return { aplicadas, seed: seedCargado };
+    return { aplicadas, seed: seedCargado, sinRoles };
   } finally {
     await c.cerrar();
   }

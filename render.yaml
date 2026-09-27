@@ -1,5 +1,13 @@
-# Blueprint de Render: la app en el plan gratis, con la base de datos en Neon (también gratis).
+# Blueprint de Render: la app y su base de datos PostgreSQL, las dos en el plan gratis.
 # Guía: deploy/RENDER.md
+databases:
+  - name: alcien-db
+    plan: free
+    region: ohio
+    postgresMajorVersion: "16"
+    databaseName: alcien
+    user: alcien
+
 services:
   - type: web
     name: alcien
@@ -10,9 +18,11 @@ services:
     healthCheckPath: /api/salud
     autoDeploy: true
     envVars:
-      # Cadena de conexión de Neon (la pegas al crear el servicio)
+      # La app migra la base al arrancar con esta conexión (red interna de Render)
       - key: ALCIEN_DB_ADMIN_URL
-        sync: false
+        fromDatabase:
+          name: alcien-db
+          property: connectionString
       # Se generan solas y quedan guardadas en Render
       - key: ALCIEN_DB_API_PASSWORD
         generateValue: true

@@ -98,6 +98,12 @@ BASE=http://localhost:8080 node e2e/flujo-venta.mjs   # recorrido completo en na
 
 La CI de GitHub corre las tres en cada cambio y guarda las capturas del recorrido.
 
+## Probar gratis en Render
+
+[![Desplegar en Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/echangof123-dev/nubegocio-alcien)
+
+`render.yaml` crea la app y su PostgreSQL en el plan gratis, sin tarjeta. La app migra la base al arrancar. Si el PostgreSQL no permite crear usuarios, usa el "modo sin roles": la seguridad por fila queda obligatoria también para la dueña de las tablas (la CI corre todas las pruebas de la API también así). Guía: `deploy/RENDER.md`.
+
 ## Desplegar en Google Cloud
 
 [![Abrir en Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/echangof123-dev/nubegocio-alcien&cloudshell_tutorial=deploy/TUTORIAL.md&show=terminal)
