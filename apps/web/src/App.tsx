@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ErrorApi, mensajeDe, negocioGuardado, usarNegocio } from "./api";
 import type { InfoNegocio, LineaCarrito, NegocioResumen, Sesion } from "./tipos";
 import { Aviso, Cargando, Toast } from "./componentes/basicos";
-import { ICaja, IFiados, IProductos, IReportes, ITienda } from "./componentes/iconos";
+import { ICaja, IMenu, IProductos, IReportes, ITienda } from "./componentes/iconos";
 import { Acceso } from "./pantallas/Acceso";
 import { Registro } from "./pantallas/Registro";
 import { Vender } from "./pantallas/Vender";
@@ -12,6 +12,12 @@ import { Productos } from "./pantallas/Productos";
 import { Fiados } from "./pantallas/Fiados";
 import { Reportes } from "./pantallas/Reportes";
 import { Facturacion } from "./pantallas/Facturacion";
+import { Mas } from "./pantallas/Mas";
+import { Modulos } from "./pantallas/Modulos";
+import { Compras } from "./pantallas/Compras";
+import { Cotizaciones } from "./pantallas/Cotizaciones";
+import { Equipo } from "./pantallas/Equipo";
+import { PANTALLAS, titulo } from "./modulos";
 
 function useRuta(): [string, (r: string) => void] {
   const [ruta, setRuta] = useState(location.pathname);
@@ -28,13 +34,16 @@ function useRuta(): [string, (r: string) => void] {
   return [ruta, navegar];
 }
 
-const NAV = [
-  { ruta: "/", nombre: "Vender", Icono: ITienda },
-  { ruta: "/productos", nombre: "Productos", Icono: IProductos },
-  { ruta: "/fiados", nombre: "Fiados", Icono: IFiados },
-  { ruta: "/caja", nombre: "Caja", Icono: ICaja },
-  { ruta: "/reportes", nombre: "Reportes", Icono: IReportes },
-];
+/** Menú de abajo: lo común a todo negocio. Lo propio de cada negocio va en "Más". */
+function menu(info: InfoNegocio) {
+  return [
+    { ruta: "/", nombre: "Vender", Icono: ITienda },
+    { ruta: "/productos", nombre: titulo(info.negocio.palabra_items || "productos"), Icono: IProductos },
+    { ruta: "/caja", nombre: "Caja", Icono: ICaja },
+    { ruta: "/reportes", nombre: "Reportes", Icono: IReportes },
+    { ruta: "/mas", nombre: "Más", Icono: IMenu },
+  ];
+}
 
 export function App() {
   const [sesion, setSesion] = useState<Sesion | null | undefined>(undefined);
@@ -70,6 +79,10 @@ export function App() {
         else setError(mensajeDe(e));
       });
   }, [elegir]);
+
+  const recargarInfo = useCallback(() => {
+    api<InfoNegocio>("GET", "/negocio").then(setInfo).catch(() => {});
+  }, []);
 
   // Datos del negocio elegido
   useEffect(() => {
@@ -123,6 +136,12 @@ export function App() {
     case "/productos": pantalla = <Productos info={info} avisar={avisar} />; break;
     case "/fiados": pantalla = <Fiados avisar={avisar} />; break;
     case "/facturacion": pantalla = <Facturacion info={info} avisar={avisar} navegar={navegar} />; break;
+    case "/mas": pantalla = <Mas info={info} navegar={navegar} />; break;
+    case "/modulos": pantalla = <Modulos info={info} avisar={avisar} navegar={navegar} alCambiar={recargarInfo} />; break;
+    case "/compras": pantalla = <Compras info={info} avisar={avisar} />; break;
+    case "/lotes": pantalla = <Compras info={info} avisar={avisar} inicial="lotes" />; break;
+    case "/cotizaciones": pantalla = <Cotizaciones info={info} avisar={avisar} />; break;
+    case "/equipo": pantalla = <Equipo info={info} avisar={avisar} />; break;
     case "/reportes":
       pantalla = <Reportes info={info} avisar={avisar} alSalir={salir} navegar={navegar}
         alCambiarNegocio={sesion.negocios.length > 1 ? () => {
@@ -150,12 +169,15 @@ export function App() {
       {pantalla}
       {conNav && (
         <nav className="nav-inferior" aria-label="Menú principal">
-          {NAV.map(({ ruta: r, nombre, Icono }) => (
-            <a key={r} href={r} className={ruta === r ? "activo" : ""} aria-current={ruta === r ? "page" : undefined}
+          {menu(info).map(({ ruta: r, nombre, Icono }) => {
+            const activo = ruta === r || (r === "/mas" && (ruta === "/modulos" || PANTALLAS.some((p) => p.ruta === ruta)));
+            return (
+            <a key={r} href={r} className={activo ? "activo" : ""} aria-current={activo ? "page" : undefined}
               onClick={(e) => { e.preventDefault(); navegar(r); }}>
               <Icono tam={22} />{nombre}
             </a>
-          ))}
+            );
+          })}
         </nav>
       )}
       <Toast texto={toast} />

@@ -108,7 +108,27 @@ try {
   const p12 = path.join(os.tmpdir(), "firma-prueba-alcien.p12");
   const raiz = path.dirname(path.dirname(new URL(import.meta.url).pathname));
   fs.writeFileSync(p12, Buffer.from(fs.readFileSync(path.join(raiz, "apps/api/test/fixtures/firma-legacy.p12.b64"), "utf8"), "base64"));
-  await pagina.getByRole("button", { name: /Facturación electrónica/ }).click();
+  // Más: los módulos propios de este negocio
+  await pagina.getByRole("link", { name: "Más" }).click();
+  await esperarTexto("Compras");
+  await foto("mas");
+  await pagina.getByRole("button", { name: /Módulos/ }).click();
+  await esperarTexto("De tu negocio");
+  await foto("modulos");
+  await pagina.getByRole("link", { name: "Más" }).click();
+  await pagina.getByRole("button", { name: /^Compras/ }).click();
+  await pagina.getByRole("button", { name: "Registrar compra" }).click();
+  await pagina.getByRole("button", { name: "Agregar producto" }).click();
+  await pagina.getByRole("button", { name: /Arroz 1 kg/ }).click();
+  await pagina.getByLabel(/Cantidad/).fill("10");
+  await pagina.getByLabel("Costo por unidad").fill("1,05");
+  await foto("compra-nueva");
+  await pagina.getByRole("button", { name: /Guardar compra de \$ 10,50/ }).click();
+  await esperarTexto("Compra N.º 1");
+  await foto("compras");
+
+  await pagina.getByRole("link", { name: "Más" }).click();
+  await pagina.getByRole("button", { name: /Facturación/ }).click();
   await esperarTexto("Datos del SRI");
   await pagina.getByLabel("RUC", { exact: true }).fill("1710034065001");
   await pagina.getByLabel("Razón social o nombres completos").fill("Rosa Elena Quishpe");

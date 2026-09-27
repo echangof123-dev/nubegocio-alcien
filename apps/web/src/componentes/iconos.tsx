@@ -30,3 +30,10 @@ export const IAlerta = (p: P) => <Icono {...p}><circle cx="12" cy="12" r="10" />
 export const IChispa = (p: P) => <Icono {...p}><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /></Icono>;
 export const ISalir = (p: P) => <Icono {...p}><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" /></Icono>;
 export const IBasura = (p: P) => <Icono {...p}><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3" /></Icono>;
+export const IMenu = (p: P) => <Icono {...p}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></Icono>;
+export const ICamion = (p: P) => <Icono {...p}><path d="M3 6h11v10H3z" /><path d="M14 10h4l3 3v3h-7" /><circle cx="7" cy="17.5" r="1.8" /><circle cx="17" cy="17.5" r="1.8" /></Icono>;
+export const IDocumento = (p: P) => <Icono {...p}><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4M9 12h6M9 16h6" /></Icono>;
+export const IUsuarios = (p: P) => <Icono {...p}><circle cx="9" cy="8" r="3.2" /><path d="M3 20c.6-3.4 3-5.2 6-5.2s5.4 1.8 6 5.2" /><path d="M16 5.5a3 3 0 0 1 0 5.6M18 14.9c1.6.7 2.6 2.4 3 5.1" /></Icono>;
+export const IPiezas = (p: P) => <Icono {...p}><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" /><path d="M17 14v6M14 17h6" /></Icono>;
+export const IReloj = (p: P) => <Icono {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Icono>;
+export const IFactura = (p: P) => <Icono {...p}><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z" /><path d="M9 8h6M9 12h6" /></Icono>;

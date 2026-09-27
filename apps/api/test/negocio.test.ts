@@ -39,7 +39,7 @@ test("alta automática: de '¿qué negocio tienes?' a vender", async () => {
   // Activar un módulo sugerido
   const act = await rosa.post("/negocio/modulos/M17", { activo: true });
   assert.equal(act.status, 200);
-  assert.equal(act.datos.modulos.find((x: { modulo: string }) => x.modulo === "M17").estado, "bloqueado", "Listas de precios es de Pro");
+  assert.equal(act.datos.modulos.find((x: { modulo: string }) => x.modulo === "M17").estado, "activo", "en la prueba gratis se usa todo (Listas de precios es de Pro)");
 
   // Configuración
   const cfg = await rosa.patch("/negocio/config", { metodos_pago: ["efectivo", "deuna"], iva_defecto: 15 });

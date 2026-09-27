@@ -250,3 +250,13 @@ p { margin: 0; }
 .acciones-fila { display: flex; gap: 8px; flex-wrap: wrap; }
 .mensaje-sri { font-size: 13px; color: var(--ink-muted); overflow-wrap: anywhere; }
 @media (max-width: 480px) { .rejilla-2 { grid-template-columns: 1fr; } }
+
+/* ---------- Más ---------- */
+
+.rejilla-mas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 124px; padding: 14px; text-align: left;
+  border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-card); }
+.tile strong { font-size: 16px; }
+.tile span:last-child { font-size: 13px; color: var(--ink-muted); line-height: 1.35; }
+.tile-icono { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--brand-soft); color: var(--brand); margin-bottom: 6px; }

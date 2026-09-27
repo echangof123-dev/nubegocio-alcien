@@ -18,13 +18,27 @@ grant execute on function pg_temp.estado(text) to alcien_app;
 
 set local role alcien_app;
 
+-- En la prueba gratis se usa todo (como Pro)
+do $$
+declare
+  v uuid := (select negocio from ids);
+begin
+  perform app.entrar_negocio('00000000-0000-0000-0000-0000000000c1', v);
+  assert app.plan_vigente(v) = 'pro', 'la prueba usa todo';
+  assert pg_temp.estado('M16') = 'activo', 'lotes activo durante la prueba';
+end $$;
+
+reset role;
+update app.suscripcion set estado = 'activa' where negocio_id = (select negocio from ids);
+set local role alcien_app;
+
 do $$
 declare
   v uuid := (select negocio from ids);
 begin
   perform app.entrar_negocio('00000000-0000-0000-0000-0000000000c1', v);
 
-  -- En la prueba (plan Negocio)
+  -- Con el plan Negocio pagado
   assert pg_temp.estado('M01') = 'activo', 'ventas activo';
   assert pg_temp.estado('M19') = 'activo', 'SRI activo en plan Negocio';
   assert pg_temp.estado('M16') = 'bloqueado', 'lotes: de la familia, pero solo en Pro';

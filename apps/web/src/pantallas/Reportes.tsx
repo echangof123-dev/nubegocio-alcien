@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, mensajeDe } from "../api";
 import type { InfoNegocio } from "../tipos";
-import { puedeGestionar, tieneModulo } from "../tipos";
+import { puedeGestionar } from "../tipos";
 import type { EstadoComprobante } from "../tipos";
 import { EstadoSri } from "../componentes/comprobante";
 import { dinero, hora } from "../formato";
@@ -14,7 +14,7 @@ interface VentaLista {
 }
 interface Resumen { ventas: number; total: number; ticket_promedio: number; fiado_por_cobrar: number }
 
-export function Reportes({ info, avisar, alSalir, alCambiarNegocio, navegar }: {
+export function Reportes({ info, avisar, alSalir, alCambiarNegocio }: {
   info: InfoNegocio; avisar: (t: string) => void; alSalir: () => void; alCambiarNegocio?: () => void; navegar: (r: string) => void;
 }) {
   const [resumen, setResumen] = useState<Resumen | null>(null);
@@ -64,12 +64,6 @@ export function Reportes({ info, avisar, alSalir, alCambiarNegocio, navegar }: {
           {ventas.length === 0 && <p className="muted">Todavía no hay ventas hoy.</p>}
         </div>
       </div>
-
-      {tieneModulo(info, "M19") && (
-        <button className="item-opcion" onClick={() => navegar("/facturacion")}>
-          <span className="textos"><strong>Facturación electrónica</strong><span>Datos del SRI, firma y comprobantes emitidos</span></span>
-        </button>
-      )}
 
       <div className="tarjeta">
         <h3>{n.nombre}</h3>
