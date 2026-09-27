@@ -53,7 +53,7 @@ test("migrar una base vacía, dos veces", async () => {
     assert.equal(r1.seed, true);
 
     const r2 = await migrar(opc);
-    assert.deepEqual(r2, { aplicadas: [], seed: false }, "la segunda vez no hace nada");
+    assert.deepEqual(r2, { aplicadas: [], seed: false, sinRoles: false }, "la segunda vez no hace nada");
 
     // La API entra con su propio usuario, que no se salta la seguridad por fila
     const api = new ConexionPg({ ...admin, database: BASE, user: opc.usuarioApi, password: opc.claveApi });
