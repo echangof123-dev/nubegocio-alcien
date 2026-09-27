@@ -18,11 +18,15 @@ FROM node:22-slim
 ENV NODE_ENV=production \
     ALCIEN_ENTORNO=produccion \
     ALCIEN_WEB_DIR=/app/web \
+    ALCIEN_DB_DIR=/app/db \
     PORT=8080
 WORKDIR /app
 # La API no tiene dependencias de ejecución: solo su código compilado
 COPY --from=compilar /src/apps/api/dist ./api
 COPY --from=compilar /src/apps/web/dist ./web
+# Migraciones y catálogo: se aplican al arrancar cuando hay ALCIEN_DB_ADMIN_URL (Render + Neon)
+COPY db/migrations ./db/migrations
+COPY db/seed ./db/seed
 RUN echo '{"type":"module"}' > ./api/package.json
 USER node
 EXPOSE 8080

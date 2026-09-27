@@ -1,0 +1,31 @@
+# Blueprint de Render: la app en el plan gratis, con la base de datos en Neon (también gratis).
+# Guía: deploy/RENDER.md
+services:
+  - type: web
+    name: alcien
+    runtime: docker
+    plan: free
+    region: ohio
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/salud
+    autoDeploy: true
+    envVars:
+      # Cadena de conexión de Neon (la pegas al crear el servicio)
+      - key: ALCIEN_DB_ADMIN_URL
+        sync: false
+      # Se generan solas y quedan guardadas en Render
+      - key: ALCIEN_DB_API_PASSWORD
+        generateValue: true
+      - key: ALCIEN_SECRETO_CODIGOS
+        generateValue: true
+      - key: ALCIEN_CLAVE_FIRMAS
+        generateValue: true
+      - key: ALCIEN_TOKEN_TAREAS
+        generateValue: true
+      # Beta cerrada: el código de acceso queda en los registros (Logs) de Render
+      - key: WHATSAPP_PROVEEDOR
+        value: registro
+      - key: ALCIEN_PERMITIR_CODIGOS_EN_REGISTRO
+        value: "true"
+      - key: SRI_INTERVALO_SEG
+        value: "60"

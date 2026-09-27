@@ -2,6 +2,14 @@ import { cargarConfig } from "./config.js";
 import { crearApp, log } from "./app.js";
 
 const cfg = cargarConfig();
+
+// Servicios sin terminal (Render + Neon): el esquema se aplica al arrancar
+if (cfg.migrar) {
+  const { migrar } = await import("./migrar.js");
+  const r = await migrar({ ...cfg.migrar, log: (m, e) => log("info", m, e) });
+  log("info", "base de datos al día", { aplicadas: r.aplicadas.length, catalogo: r.seed });
+}
+
 const app = crearApp(cfg);
 
 app.servidor.listen(cfg.puerto, () => {
