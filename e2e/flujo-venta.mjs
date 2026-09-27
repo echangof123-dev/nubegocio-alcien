@@ -1,11 +1,15 @@
 // Recorrido completo en un navegador real, en tamaño de celular:
-// entrar con código → registrar el negocio → abrir caja → poner precios → vender → cobrar → cuadrar la caja.
+// entrar con código → registrar el negocio → abrir caja → poner precios → vender → cobrar → cuadrar la caja
+// → configurar la facturación electrónica → vender con factura → ver el RIDE.
 //
+//   node e2e/sri-falso.mjs &
 //   BASE=http://localhost:8080 node e2e/flujo-venta.mjs
-// Necesita la API en modo desarrollo (el código de acceso aparece en pantalla).
+// Necesita la API en modo desarrollo (el código de acceso aparece en pantalla) y
+// SRI_URL_PRUEBAS=http://127.0.0.1:9099/ws para usar el SRI de mentira.
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 
 const BASE = process.env.BASE ?? "http://localhost:8080";
 const CAPTURAS = path.join(path.dirname(new URL(import.meta.url).pathname), "capturas");
@@ -100,7 +104,61 @@ try {
   await esperarTexto("Ventas de hoy");
   await foto("reportes");
 
-  // 8. En computador
+  // 8. Facturación electrónica: datos del SRI y firma (de prueba)
+  const p12 = path.join(os.tmpdir(), "firma-prueba-alcien.p12");
+  const raiz = path.dirname(path.dirname(new URL(import.meta.url).pathname));
+  fs.writeFileSync(p12, Buffer.from(fs.readFileSync(path.join(raiz, "apps/api/test/fixtures/firma-legacy.p12.b64"), "utf8"), "base64"));
+  await pagina.getByRole("button", { name: /Facturación electrónica/ }).click();
+  await esperarTexto("Datos del SRI");
+  await pagina.getByLabel("RUC", { exact: true }).fill("1710034065001");
+  await pagina.getByLabel("Razón social o nombres completos").fill("Rosa Elena Quishpe");
+  await pagina.getByLabel("Nombre comercial (opcional)").fill("Tienda Doña Rosa");
+  await pagina.getByLabel("Dirección matriz").fill("Calle Bolívar 123 y Sucre, Quito");
+  await pagina.getByLabel("Archivo .p12").setInputFiles(p12);
+  await pagina.getByLabel("Contraseña de la firma").fill("Prueba.123");
+  await foto("facturacion-datos");
+  await pagina.getByRole("button", { name: "Guardar", exact: true }).click();
+  await esperarTexto("Siguiente factura N.º 1");
+  await foto("facturacion-lista-para-facturar");
+
+  // 9. Vender con factura a un cliente con cédula
+  await pagina.getByRole("link", { name: "Vender" }).click();
+  await pagina.getByRole("button", { name: "Abrir caja" }).first().click();
+  await pagina.getByLabel("Efectivo inicial").fill("20");
+  await pagina.getByRole("button", { name: "Abrir caja" }).click();
+  await esperarTexto("Cierre de caja");
+  await pagina.getByRole("link", { name: "Vender" }).click();
+  await tocar("Arroz 1 kg");
+  await tocar("Leche 1 L");
+  await esperarTexto("$ 2,35");
+  await pagina.locator(".barra-cobro").getByRole("button", { name: "Cobrar" }).click();
+  await pagina.getByRole("button", { name: "Factura", exact: true }).click();
+  await pagina.getByRole("button", { name: "Con datos" }).click();
+  await pagina.getByRole("button", { name: "Nuevo cliente" }).click();
+  await pagina.getByLabel("Nombre o razón social").fill("Carlos Mena");
+  await pagina.getByLabel("Cédula o RUC").fill("1710034065");
+  await pagina.getByLabel(/Celular/).fill("0991112233");
+  await foto("factura-cliente");
+  await pagina.getByRole("button", { name: "Guardar cliente" }).click();
+  await esperarTexto("1710034065");
+  await foto("cobrar-con-factura");
+  await pagina.getByRole("button", { name: "Cobrar $ 2,35" }).click();
+  await esperarTexto("¡Venta registrada!");
+  await esperarTexto("Autorizada");
+  await foto("factura-autorizada");
+
+  // 10. El RIDE que recibe el cliente
+  const ride = await pagina.getByRole("link", { name: "Ver factura" }).getAttribute("href");
+  await pagina.goto(ride);
+  await esperarTexto("001-001-000000001");
+  await foto("ride");
+  await pagina.setViewportSize({ width: 1024, height: 900 });
+  await pagina.screenshot({ path: path.join(CAPTURAS, `${String(++n).padStart(2, "0")}-ride-computador.png`), fullPage: true });
+  await pagina.goto(BASE + "/facturacion");
+  await esperarTexto("Comprobantes");
+  await foto("facturacion-comprobantes");
+
+  // 11. En computador
   await pagina.setViewportSize({ width: 1280, height: 800 });
   await pagina.getByRole("link", { name: "Vender" }).click();
   await esperarTexto("Buscar producto");

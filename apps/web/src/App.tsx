@@ -11,6 +11,7 @@ import { Caja } from "./pantallas/Caja";
 import { Productos } from "./pantallas/Productos";
 import { Fiados } from "./pantallas/Fiados";
 import { Reportes } from "./pantallas/Reportes";
+import { Facturacion } from "./pantallas/Facturacion";
 
 function useRuta(): [string, (r: string) => void] {
   const [ruta, setRuta] = useState(location.pathname);
@@ -121,8 +122,9 @@ export function App() {
     case "/caja": pantalla = <Caja info={info} avisar={avisar} />; break;
     case "/productos": pantalla = <Productos info={info} avisar={avisar} />; break;
     case "/fiados": pantalla = <Fiados avisar={avisar} />; break;
+    case "/facturacion": pantalla = <Facturacion info={info} avisar={avisar} navegar={navegar} />; break;
     case "/reportes":
-      pantalla = <Reportes info={info} avisar={avisar} alSalir={salir}
+      pantalla = <Reportes info={info} avisar={avisar} alSalir={salir} navegar={navegar}
         alCambiarNegocio={sesion.negocios.length > 1 ? () => {
           const i = sesion.negocios.findIndex((n) => n.negocio_id === negocioId);
           const siguiente = sesion.negocios[(i + 1) % sesion.negocios.length]!;

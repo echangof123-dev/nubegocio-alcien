@@ -58,7 +58,7 @@ export class ArregloPg {
 // ---------- Conversión de valores ----------
 
 const OID = {
-  bool: 16, int8: 20, int2: 21, int4: 23, oid: 26, json: 114, float4: 700, float8: 701,
+  bool: 16, bytea: 17, int8: 20, int2: 21, int4: 23, oid: 26, json: 114, float4: 700, float8: 701,
   numeric: 1700, jsonb: 3802, textArray: 1009, varcharArray: 1015, uuidArray: 2951,
   timestamp: 1114, timestamptz: 1184,
 } as const;
@@ -74,6 +74,7 @@ export function aTextoPg(valor: unknown): string | null {
   if (valor instanceof ArregloPg) return "{" + valor.valores.map(citarElementoArreglo).join(",") + "}";
   if (typeof valor === "boolean") return valor ? "t" : "f";
   if (valor instanceof Date) return valor.toISOString();
+  if (Buffer.isBuffer(valor)) return "\\x" + valor.toString("hex");   // bytea
   if (typeof valor === "object") return JSON.stringify(valor);   // json / jsonb
   return String(valor);
 }
@@ -109,6 +110,7 @@ function parsearArregloTexto(s: string): (string | null)[] {
 function desdeTextoPg(texto: string, oid: number): unknown {
   switch (oid) {
     case OID.bool: return texto === "t";
+    case OID.bytea: return Buffer.from(texto.slice(2), "hex");      // formato hex: \x0a1b...
     case OID.int2: case OID.int4: case OID.oid: return Number(texto);
     case OID.int8: {
       const n = Number(texto);

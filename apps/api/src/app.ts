@@ -9,11 +9,15 @@ import { rutasAcceso } from "./rutas/acceso.js";
 import { rutasNegocio } from "./rutas/negocio.js";
 import { rutasProductos } from "./rutas/productos.js";
 import { rutasVentas } from "./rutas/ventas.js";
+import { rutasSri } from "./rutas/sri.js";
+import { ServicioSri } from "./sri/servicio.js";
+import { ClienteSriHttp, type ClienteSri } from "./sri/cliente.js";
 
 export interface App {
   servidor: http.Server;
   pool: Pool;
   enviador: EnviadorCodigos;
+  sri: ServicioSri;
   cerrar(): Promise<void>;
 }
 
@@ -22,7 +26,7 @@ export function log(nivel: "info" | "error", msg: string, extra: Record<string, 
   console.log(JSON.stringify({ severity: nivel === "error" ? "ERROR" : "INFO", message: msg, ...extra }));
 }
 
-export function crearApp(cfg: Config, opc: { enviador?: EnviadorCodigos; ia?: GeneradorPlantillas; silencioso?: boolean } = {}): App {
+export function crearApp(cfg: Config, opc: { enviador?: EnviadorCodigos; ia?: GeneradorPlantillas; clienteSri?: ClienteSri; esperaSriMs?: number; silencioso?: boolean } = {}): App {
   const pool = new Pool({ ...cfg.db, applicationName: "alcien-api" }, cfg.db.max);
   const enviador = opc.enviador ?? crearEnviador(cfg.whatsapp);
   const ia = opc.ia ?? crearGenerador(cfg.ia);
@@ -30,6 +34,8 @@ export function crearApp(cfg: Config, opc: { enviador?: EnviadorCodigos; ia?: Ge
   const limites = cfg.entorno === "pruebas" ? { porIp: 10_000, global: 10_000 } : { porIp: 10, global: 500 };
   const acceso = new ServicioAcceso(pool, enviador, cfg.secretoCodigos, limites);
   const registrar = opc.silencioso ? () => {} : log;
+
+  const sri = new ServicioSri(pool, cfg.sri.claveFirmas, opc.clienteSri ?? new ClienteSriHttp(cfg.sri.urls), registrar, opc.esperaSriMs ?? 2000);
 
   const router = new Router();
   router.publico("GET", "/salud", async () => {
@@ -39,7 +45,8 @@ export function crearApp(cfg: Config, opc: { enviador?: EnviadorCodigos; ia?: Ge
   rutasAcceso(router, { db: pool, acceso, enviador, desarrollo: cfg.entorno !== "produccion", produccion: cfg.entorno === "produccion" });
   rutasNegocio(router, { pool, ia, log: (m, e) => registrar("error", m, { error: String(e) }) });
   rutasProductos(router);
-  rutasVentas(router);
+  rutasVentas(router, { sri });
+  rutasSri(router, { pool, sri, claveFirmas: cfg.sri.claveFirmas, tokenTareas: cfg.sri.tokenTareas });
 
   const servidor = crearServidor(router, {
     pool,
@@ -54,6 +61,7 @@ export function crearApp(cfg: Config, opc: { enviador?: EnviadorCodigos; ia?: Ge
     servidor,
     pool,
     enviador,
+    sri,
     async cerrar() {
       await new Promise<void>((ok) => servidor.close(() => ok()));
       await pool.cerrar();

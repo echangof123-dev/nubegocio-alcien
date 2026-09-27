@@ -150,6 +150,8 @@ p { margin: 0; }
 .insignia { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .insignia.ok { background: var(--success-soft); color: var(--success); }
 .insignia.no { background: var(--accent-soft); color: var(--ink); }
+.insignia.mal { background: var(--danger-soft); color: var(--danger); }
+.insignia.gris { background: var(--surface-alt); color: var(--ink-muted); }
 .insignia.azul { background: var(--brand); color: var(--on-brand); min-width: 24px; justify-content: center; }
 
 /* ---------- Registro ---------- */
@@ -235,3 +237,16 @@ p { margin: 0; }
 @media (min-width: 900px) {
   .contenido { padding: 24px; padding-bottom: 110px; }
 }
+
+/* ---------- Facturación ---------- */
+
+.casilla { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 600; }
+.casilla input { width: 22px; height: 22px; accent-color: var(--brand); }
+.rejilla-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.comprobante-fila { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.comprobante-fila:last-child { border-bottom: none; }
+.comprobante-fila .textos { display: flex; flex-direction: column; min-width: 0; }
+.comprobante-fila .textos span { font-size: 13px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.acciones-fila { display: flex; gap: 8px; flex-wrap: wrap; }
+.mensaje-sri { font-size: 13px; color: var(--ink-muted); overflow-wrap: anywhere; }
+@media (max-width: 480px) { .rejilla-2 { grid-template-columns: 1fr; } }

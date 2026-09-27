@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, mensajeDe } from "../api";
 import type { InfoNegocio } from "../tipos";
-import { puedeGestionar } from "../tipos";
+import { puedeGestionar, tieneModulo } from "../tipos";
+import type { EstadoComprobante } from "../tipos";
+import { EstadoSri } from "../componentes/comprobante";
 import { dinero, hora } from "../formato";
 import { Aviso, Cargando, Dialogo } from "../componentes/basicos";
 import { ISalir } from "../componentes/iconos";
 
-interface VentaLista { id: string; numero: number; estado: string; total: number; creado_en: string; cliente: string | null; metodos: string | null }
+interface VentaLista {
+  id: string; numero: number; estado: string; total: number; creado_en: string; cliente: string | null; metodos: string | null;
+  factura: { id: string; numero: string; estado: EstadoComprobante; consumidor_final: boolean } | null;
+}
 interface Resumen { ventas: number; total: number; ticket_promedio: number; fiado_por_cobrar: number }
 
-export function Reportes({ info, avisar, alSalir, alCambiarNegocio }: {
-  info: InfoNegocio; avisar: (t: string) => void; alSalir: () => void; alCambiarNegocio?: () => void;
+export function Reportes({ info, avisar, alSalir, alCambiarNegocio, navegar }: {
+  info: InfoNegocio; avisar: (t: string) => void; alSalir: () => void; alCambiarNegocio?: () => void; navegar: (r: string) => void;
 }) {
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [ventas, setVentas] = useState<VentaLista[]>([]);
@@ -46,6 +51,7 @@ export function Reportes({ info, avisar, alSalir, alCambiarNegocio }: {
               <span style={{ display: "flex", flexDirection: "column" }}>
                 <span className={v.estado === "anulada" ? "anulada" : ""}><strong>N.º {v.numero}</strong> · {hora(v.creado_en)}</span>
                 <span className="muted" style={{ fontSize: 13 }}>{v.estado === "anulada" ? "Anulada" : `${v.metodos ?? ""}${v.cliente ? ` · ${v.cliente}` : ""}`}</span>
+                {v.factura && <span style={{ fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}>Factura {v.factura.numero} <EstadoSri estado={v.factura.estado} /></span>}
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <strong className={v.estado === "anulada" ? "anulada" : ""}>{dinero(v.total)}</strong>
@@ -59,6 +65,12 @@ export function Reportes({ info, avisar, alSalir, alCambiarNegocio }: {
         </div>
       </div>
 
+      {tieneModulo(info, "M19") && (
+        <button className="item-opcion" onClick={() => navegar("/facturacion")}>
+          <span className="textos"><strong>Facturación electrónica</strong><span>Datos del SRI, firma y comprobantes emitidos</span></span>
+        </button>
+      )}
+
       <div className="tarjeta">
         <h3>{n.nombre}</h3>
         <p className="muted">{n.tipo} · Plan {n.plan_vigente}{n.suscripcion === "prueba" ? ` · prueba: quedan ${diasPrueba} días` : ""}</p>
@@ -68,22 +80,32 @@ export function Reportes({ info, avisar, alSalir, alCambiarNegocio }: {
         </div>
       </div>
 
-      {anular && <DialogoAnular venta={anular} alCerrar={() => setAnular(null)} alAnular={() => { setAnular(null); avisar("Venta anulada"); cargar(); }} />}
+      {anular && <DialogoAnular venta={anular} alCerrar={() => setAnular(null)}
+        alAnular={(nc) => { setAnular(null); avisar(nc ? `Venta anulada con la nota de crédito ${nc}` : "Venta anulada"); cargar(); }} />}
     </div>
   );
 }
 
-function DialogoAnular({ venta, alCerrar, alAnular }: { venta: VentaLista; alCerrar: () => void; alAnular: () => void }) {
+function DialogoAnular({ venta, alCerrar, alAnular }: { venta: VentaLista; alCerrar: () => void; alAnular: (notaCredito?: string) => void }) {
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState<string | null>(null);
   async function confirmar(e: FormEvent) {
     e.preventDefault();
-    try { await api("POST", `/ventas/${venta.id}/anular`, { motivo }); alAnular(); } catch (err) { setError(mensajeDe(err)); }
+    try {
+      const r = await api<{ nota_credito: { numero: string } | null }>("POST", `/ventas/${venta.id}/anular`, { motivo });
+      alAnular(r.nota_credito?.numero);
+    } catch (err) { setError(mensajeDe(err)); }
   }
   return (
     <Dialogo titulo={`Anular venta N.º ${venta.numero}`} alCerrar={alCerrar}>
       <form onSubmit={confirmar} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <p className="muted">Se devuelven los productos al inventario y la venta deja de contar en la caja.</p>
+        {venta.factura?.estado === "autorizado" && !venta.factura.consumidor_final && (
+          <Aviso tipo="info">Tiene la factura {venta.factura.numero} autorizada: se emitirá una nota de crédito al SRI.</Aviso>
+        )}
+        {venta.factura?.estado === "autorizado" && venta.factura.consumidor_final && (
+          <Aviso tipo="atencion">Tiene factura a consumidor final: desde 2026 el SRI no permite anularla.</Aviso>
+        )}
         <div className="campo">
           <label htmlFor="motivo">Motivo</label>
           <input id="motivo" className="entrada" maxLength={200} value={motivo} onChange={(e) => setMotivo(e.target.value)} />

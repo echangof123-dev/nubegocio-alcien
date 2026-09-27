@@ -39,7 +39,7 @@ jobs:
 
       - name: El seed coincide con el Excel
         run: |
-          pip install openpyxl
+          pip install openpyxl lxml cryptography
           python3 db/tools/generar_seed.py
           git diff --exit-code db/seed/catalogo.sql || (echo "db/seed/catalogo.sql está desactualizado: corre python3 db/tools/generar_seed.py" && exit 1)
 
@@ -53,9 +53,16 @@ jobs:
         run: npm run typecheck -w @alcien/api
 
       - name: Tipos de la web
-        # Primera corrida con @types/react: si falla, revisar y quitar continue-on-error
+        id: tipos_web
+        # Si falla no detiene la CI, pero deja cada error como aviso visible en GitHub
         continue-on-error: true
-        run: npm run typecheck -w @alcien/web
+        run: |
+          set -o pipefail
+          npm run typecheck -w @alcien/web 2>&1 | sed -E 's/^(.*error TS[0-9]+.*)$/::warning title=Tipos de la web::\1/'
+
+      - name: Aviso si fallaron los tipos de la web
+        if: steps.tipos_web.outcome == 'failure'
+        run: echo "::warning title=Tipos de la web::El chequeo de tipos de la web falló"
 
       - name: Pruebas de la API
         run: bash apps/api/scripts/test.sh
@@ -69,8 +76,9 @@ jobs:
           PGDATABASE=alcien_e2e bash db/scripts/reset.sh
           PGDATABASE=alcien_e2e ALCIEN_API_PASSWORD=alcien-e2e bash db/scripts/crear_usuario_api.sh
           (cd apps/api && echo '{"type":"module"}' > dist/package.json)
+          node e2e/sri-falso.mjs &
           ALCIEN_ENTORNO=desarrollo PGUSER=alcien_api PGPASSWORD=alcien-e2e PGDATABASE=alcien_e2e \
-            ALCIEN_WEB_DIR=apps/web/dist PORT=8080 node apps/api/dist/main.js &
+            SRI_URL_PRUEBAS=http://127.0.0.1:9099/ws ALCIEN_WEB_DIR=apps/web/dist PORT=8080 node apps/api/dist/main.js &
           sleep 3
           BASE=http://localhost:8080 node e2e/flujo-venta.mjs
 

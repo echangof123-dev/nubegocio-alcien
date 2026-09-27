@@ -1,4 +1,6 @@
 import type { Router } from "../http/servidor.js";
+import type { ServicioSri } from "../sri/servicio.js";
+import { clasificar } from "../sri/identificacion.js";
 import { invalido, noEncontrado } from "../http/errores.js";
 import {
   lista, numero, numeroOpcional, objeto, opcion, texto, textoOpcional, uuid, uuidOpcional,
@@ -6,10 +8,10 @@ import {
 
 const METODOS = ["efectivo", "transferencia", "tarjeta", "deuna", "fiado"] as const;
 
-export function rutasVentas(r: Router) {
+export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
   // ---------- Ventas ----------
 
-  r.negocio("POST", "/ventas", async (p, { db }) => {
+  r.negocio("POST", "/ventas", async (p, { db, alConfirmar }) => {
     const c = objeto(p.cuerpo);
     const items = lista(c.items, "Los productos", { min: 1, max: 200 }).map((x, i) => {
       const it = objeto(x, `Producto ${i + 1}`);
@@ -36,12 +38,21 @@ export function rutasVentas(r: Router) {
       return pago;
     });
 
-    const { rows } = await db.query(
+    const comprobante = c.comprobante === undefined ? "nota" : opcion(c.comprobante, "El comprobante", ["nota", "factura"] as const);
+    const { rows } = await db.query<{ venta_id: string }>(
       "select * from app.registrar_venta($1::jsonb, $2::jsonb, $3, $4, $5)",
-      [items, pagos, uuidOpcional(c.cliente_id, "El cliente"),
-       c.comprobante === undefined ? "nota" : opcion(c.comprobante, "El comprobante", ["nota", "factura"] as const),
-       textoOpcional(c.nota, "La nota", { max: 200 })]);
-    return { status: 201, cuerpo: { venta: rows[0] } };
+      [items, pagos, uuidOpcional(c.cliente_id, "El cliente"), comprobante, textoOpcional(c.nota, "La nota", { max: 200 })]);
+
+    // Factura: se reserva el número, se arma y se firma en la misma transacción (si algo falla,
+    // la venta tampoco se guarda). El envío al SRI va después del COMMIT.
+    let factura = null;
+    if (comprobante === "factura") {
+      const { rows: f } = await db.query("select id, numero, clave_acceso from app.sri_reservar($1, 'factura')", [rows[0]!.venta_id]);
+      const firmados = await dep.sri.firmarPendientes(db);
+      alConfirmar(() => dep.sri.enviar(firmados));
+      factura = f[0];
+    }
+    return { status: 201, cuerpo: { venta: rows[0], factura } };
   });
 
   r.negocio("GET", "/ventas", async (p, { db }) => {
@@ -49,7 +60,11 @@ export function rutasVentas(r: Router) {
     if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) throw invalido("La fecha debe ser AAAA-MM-DD");
     const { rows } = await db.query(
       `select v.id, v.numero, v.estado, v.total, v.comprobante, v.creado_en, c.nombre as cliente,
-              (select string_agg(distinct metodo, ', ') from app.pago where venta_id = v.id) as metodos
+              (select string_agg(distinct metodo, ', ') from app.pago where venta_id = v.id) as metodos,
+              (select jsonb_build_object('id', f.id, 'numero', f.numero, 'estado', f.estado,
+                                         'consumidor_final', f.comprador->>'tipo_identificacion' = '07')
+                 from app.comprobante f where f.venta_id = v.id and f.tipo = 'factura' and f.estado <> 'anulado'
+                 order by f.creado_en desc limit 1) as factura
        from app.venta v
        join app.negocio n on n.id = v.negocio_id
        left join app.cliente c on c.id = v.cliente_id
@@ -71,14 +86,22 @@ export function rutasVentas(r: Router) {
        from app.venta_detalle where venta_id = $1 order by id`, [id]);
     const { rows: pagos } = await db.query(
       "select metodo, monto, recibido, vuelto, referencia from app.pago where venta_id = $1 order by id", [id]);
-    return { venta: v[0], detalle, pagos };
+    const { rows: comprobantes } = await db.query(
+      `select id, tipo, numero, estado, token_publico, mensajes from app.comprobante
+       where venta_id = $1 order by creado_en`, [id]);
+    return { venta: v[0], detalle, pagos, comprobantes };
   });
 
-  r.negocio("POST", "/ventas/:id/anular", async (p, { db }) => {
+  r.negocio("POST", "/ventas/:id/anular", async (p, { db, alConfirmar }) => {
     const id = uuid(p.params.id, "La venta");
     const motivo = texto(objeto(p.cuerpo).motivo, "El motivo", { min: 3, max: 200 });
     await db.query("select app.anular_venta($1, $2)", [id, motivo]);
-    return { anulada: true };
+    // Si la factura estaba autorizada, se generó una nota de crédito: se firma aquí y se envía después
+    const firmados = await dep.sri.firmarPendientes(db);
+    alConfirmar(() => dep.sri.enviar(firmados));
+    const { rows } = await db.query(
+      "select id, numero from app.comprobante where venta_id = $1 and tipo = 'nota_credito' order by creado_en desc limit 1", [id]);
+    return { anulada: true, nota_credito: rows[0] ?? null };
   });
 
   r.negocio("GET", "/resumen/hoy", async (_p, { db }) => {
@@ -143,10 +166,12 @@ export function rutasVentas(r: Router) {
     const q = (p.query.get("q") ?? "").trim().slice(0, 60);
     const conDeuda = p.query.get("con_deuda") === "1";
     const { rows } = await db.query(
-      `select s.cliente_id as id, s.nombre, s.celular, s.limite_credito, s.saldo, s.ultimo_cargo
+      `select s.cliente_id as id, s.nombre, s.celular, s.limite_credito, s.saldo, s.ultimo_cargo,
+              c.identificacion, c.tipo_identificacion, c.correo, c.direccion
        from app.cliente_saldo s join app.cliente c on c.id = s.cliente_id
        where c.activo
-         and ($1 = '' or catalogo.normalizar(s.nombre) like '%' || catalogo.normalizar($1) || '%' or s.celular like '%' || $1 || '%')
+         and ($1 = '' or catalogo.normalizar(s.nombre) like '%' || catalogo.normalizar($1) || '%'
+              or s.celular like '%' || $1 || '%' or c.identificacion like $1 || '%')
          and (not $2 or s.saldo > 0)
        order by case when $2 then s.saldo end desc nulls last, s.nombre
        limit 200`, [q, conDeuda]);
@@ -155,21 +180,52 @@ export function rutasVentas(r: Router) {
 
   r.negocio("POST", "/clientes", async (p, { db }) => {
     const c = objeto(p.cuerpo);
-    const identificacion = textoOpcional(c.identificacion, "La identificación", { max: 13 });
-    const tipo = identificacion
-      ? (identificacion.length === 13 ? "ruc" : identificacion.length === 10 ? "cedula" : "pasaporte")
-      : null;
+    const identificacion = textoOpcional(c.identificacion, "La identificación", { max: 20 })?.toUpperCase() ?? null;
+    const tipo = identificacion ? clasificar(identificacion) : null;
+    if (identificacion && !tipo) throw invalido("La cédula o el RUC no es válido");
+    const correo = textoOpcional(c.correo, "El correo", { max: 120 });
+    if (correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) throw invalido("El correo no es válido");
     const { rows } = await db.query(
-      `insert into app.cliente (negocio_id, nombre, celular, correo, tipo_identificacion, identificacion, limite_credito)
-       values (app.negocio_actual(), $1, $2, $3, $4, $5, $6)
-       returning id, nombre, celular, limite_credito`, [
+      `insert into app.cliente (negocio_id, nombre, celular, correo, tipo_identificacion, identificacion, limite_credito, direccion)
+       values (app.negocio_actual(), $1, $2, $3, $4, $5, $6, $7)
+       returning id, nombre, celular, limite_credito, identificacion, tipo_identificacion, correo, direccion`, [
         texto(c.nombre, "El nombre", { max: 120 }),
         textoOpcional(c.celular, "El celular", { max: 20 }),
-        textoOpcional(c.correo, "El correo", { max: 120 }),
+        correo,
         tipo, identificacion,
         numeroOpcional(c.limite_credito, "El límite de crédito", { min: 0, max: 1_000_000, decimales: 2 }),
+        textoOpcional(c.direccion, "La dirección", { max: 300 }),
       ]);
     return { status: 201, cuerpo: { cliente: { ...rows[0], saldo: 0 } } };
+  });
+
+  /** Completar o corregir los datos de un cliente (por ejemplo, su cédula para facturarle). */
+  r.negocio("PATCH", "/clientes/:id", async (p, { db }) => {
+    const id = uuid(p.params.id, "El cliente");
+    const c = objeto(p.cuerpo);
+    const identificacion = textoOpcional(c.identificacion, "La identificación", { max: 20 })?.toUpperCase() ?? null;
+    const tipo = identificacion ? clasificar(identificacion) : null;
+    if (identificacion && !tipo) throw invalido("La cédula o el RUC no es válido");
+    const correo = textoOpcional(c.correo, "El correo", { max: 120 });
+    if (correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) throw invalido("El correo no es válido");
+    const { rows } = await db.query(
+      `update app.cliente set
+         nombre = coalesce($2, nombre),
+         celular = coalesce($3, celular),
+         correo = coalesce($4, correo),
+         tipo_identificacion = coalesce($5, tipo_identificacion),
+         identificacion = coalesce($6, identificacion),
+         direccion = coalesce($7, direccion)
+       where id = $1
+       returning id, nombre, celular, limite_credito, identificacion, tipo_identificacion, correo, direccion`, [
+        id,
+        textoOpcional(c.nombre, "El nombre", { max: 120 }),
+        textoOpcional(c.celular, "El celular", { max: 20 }),
+        correo, tipo, identificacion,
+        textoOpcional(c.direccion, "La dirección", { max: 300 }),
+      ]);
+    if (!rows[0]) throw noEncontrado("Cliente no encontrado");
+    return { cliente: rows[0] };
   });
 
   r.negocio("GET", "/clientes/:id", async (p, { db }) => {

@@ -11,6 +11,8 @@ export interface ContextoNegocio {
   usuarioId: string;
   negocioId: string;
   rol: "dueno" | "administrador" | "cajero" | "bodeguero";
+  /** Tarea que corre después del COMMIT (por ejemplo, enviar al SRI lo recién firmado). */
+  alConfirmar(tarea: () => Promise<unknown>): void;
 }
 
 export class Pool implements Consultable {
@@ -92,12 +94,15 @@ export class Pool implements Consultable {
    * Transacción dentro de un negocio: verifica la membresía del usuario y fija el
    * contexto para que la seguridad por fila de PostgreSQL filtre todo lo demás.
    */
-  enNegocio<R>(usuarioId: string, negocioId: string, fn: (ctx: ContextoNegocio) => Promise<R>): Promise<R> {
-    return this.transaccion(async (db) => {
+  async enNegocio<R>(usuarioId: string, negocioId: string, fn: (ctx: ContextoNegocio) => Promise<R>): Promise<R> {
+    const tareas: (() => Promise<unknown>)[] = [];
+    const r = await this.transaccion(async (db) => {
       const { rows } = await db.query<{ rol: ContextoNegocio["rol"] }>(
         "select app.entrar_negocio($1, $2) as rol", [usuarioId, negocioId]);
-      return fn({ db, usuarioId, negocioId, rol: rows[0]!.rol });
+      return fn({ db, usuarioId, negocioId, rol: rows[0]!.rol, alConfirmar: (t) => { tareas.push(t); } });
     });
+    for (const t of tareas) t().catch(() => {});   // cada tarea registra sus propios errores
+    return r;
   }
 
   async cerrar() {

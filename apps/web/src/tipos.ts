@@ -53,7 +53,64 @@ export interface Producto {
 
 export interface LineaCarrito { producto: Producto; cantidad: number }
 
-export interface Cliente { id: string; nombre: string; celular: string | null; limite_credito: number | null; saldo: number }
+export interface Cliente {
+  id: string;
+  nombre: string;
+  celular: string | null;
+  limite_credito: number | null;
+  saldo: number;
+  identificacion?: string | null;
+  tipo_identificacion?: "cedula" | "ruc" | "pasaporte" | null;
+  correo?: string | null;
+  direccion?: string | null;
+}
+
+export type EstadoComprobante = "por_firmar" | "firmado" | "recibido" | "autorizado" | "devuelto" | "no_autorizado" | "anulado";
+
+export interface MensajeSri { identificador?: string; mensaje: string; informacionAdicional?: string; tipo?: string }
+
+export interface Comprobante {
+  id: string;
+  venta_id: string;
+  venta_numero: number;
+  tipo: "factura" | "nota_credito";
+  numero: string;
+  estado: EstadoComprobante;
+  ambiente: 1 | 2;
+  clave_acceso: string;
+  fecha_emision: string;
+  total: number;
+  comprador: { tipo_identificacion: string; identificacion: string; razon_social: string; telefono?: string; correo?: string };
+  mensajes: MensajeSri[];
+  numero_autorizacion: string | null;
+  fecha_autorizacion: string | null;
+  intentos: number;
+  token_publico: string;
+  motivo: string | null;
+  creado_en: string;
+}
+
+export interface ConfigSri {
+  ruc: string;
+  razon_social: string;
+  nombre_comercial: string | null;
+  dir_matriz: string;
+  dir_establecimiento: string;
+  estab: string;
+  pto_emi: string;
+  obligado_contabilidad: boolean;
+  contribuyente_especial: string | null;
+  agente_retencion: string | null;
+  regimen: "general" | "rimpe_emprendedor" | "rimpe_popular";
+  ambiente: 1 | 2;
+  tiene_firma: boolean;
+  firma_titular: string | null;
+  firma_emisor: string | null;
+  firma_vence: string | null;
+  siguiente_factura: number | null;
+}
+
+export interface EstadoSri { config: ConfigSri | null; plan_incluye: boolean; listo: boolean }
 
 export interface ResumenCaja {
   turno_id: string;

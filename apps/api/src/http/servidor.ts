@@ -26,6 +26,8 @@ export interface Respuesta {
   status?: number;
   cuerpo?: unknown;
   cookies?: string[];
+  /** Respuesta que no es JSON (el RIDE en HTML, un XML para descargar). */
+  crudo?: { tipo: string; cuerpo: string; descarga?: string };
 }
 
 type Manejador = (p: Peticion) => Promise<Respuesta | unknown>;
@@ -211,8 +213,17 @@ export function crearServidor(router: Router, dep: Dependencias): http.Server {
         }
       }
 
-      const esRespuesta = typeof resultado === "object" && resultado !== null && ("status" in resultado || "cookies" in resultado);
-      if (esRespuesta) {
+      const esRespuesta = typeof resultado === "object" && resultado !== null &&
+        ("status" in resultado || "cookies" in resultado || "crudo" in resultado);
+      if (esRespuesta && (resultado as Respuesta).crudo) {
+        const { crudo, status } = resultado as Respuesta;
+        res.statusCode = status ?? 200;
+        res.setHeader("Content-Type", crudo!.tipo);
+        res.setHeader("Cache-Control", "private, no-store");
+        res.setHeader("X-Robots-Tag", "noindex");
+        if (crudo!.descarga) res.setHeader("Content-Disposition", `attachment; filename="${crudo!.descarga.replace(/[^\w.-]/g, "_")}"`);
+        res.end(crudo!.cuerpo);
+      } else if (esRespuesta) {
         const rr = resultado as Respuesta;
         responder(rr.status ?? 200, rr.cuerpo, rr.cookies);
       } else {

@@ -7,6 +7,7 @@ import { cargarConfig } from "../src/config.js";
 import { crearApp, type App } from "../src/app.js";
 import type { EnviadorCodigos } from "../src/auth/whatsapp.js";
 import type { GeneradorPlantillas, PropuestaTipo } from "../src/ia/plantillas.js";
+import type { ClienteSri } from "../src/sri/cliente.js";
 
 export class EnviadorPrueba implements EnviadorCodigos {
   codigos = new Map<string, string>();
@@ -30,7 +31,7 @@ export interface Entorno {
   ia: IAPrueba;
 }
 
-export async function levantar(): Promise<Entorno> {
+export async function levantar(opc: { clienteSri?: ClienteSri; tokenTareas?: string } = {}): Promise<Entorno> {
   const cfg = cargarConfig({
     ...process.env,
     ALCIEN_ENTORNO: "pruebas",
@@ -39,10 +40,11 @@ export async function levantar(): Promise<Entorno> {
     PGPASSWORD: process.env.PGPASSWORD_API ?? "alcien-dev",
     PGDATABASE: process.env.PGDATABASE_API ?? "alcien_api_test",
     PORT: "0",
+    ...(opc.tokenTareas ? { ALCIEN_TOKEN_TAREAS: opc.tokenTareas } : {}),
   });
   const enviador = new EnviadorPrueba();
   const ia = new IAPrueba();
-  const app = crearApp(cfg, { enviador, ia, silencioso: true });
+  const app = crearApp(cfg, { enviador, ia, silencioso: true, clienteSri: opc.clienteSri, esperaSriMs: 0 });
   await new Promise<void>((ok) => app.servidor.listen(0, "127.0.0.1", ok));
   const { port } = app.servidor.address() as AddressInfo;
   return { app, url: `http://127.0.0.1:${port}`, enviador, ia };
@@ -62,7 +64,7 @@ export class Cliente {
     const setCookie = r.headers.get("set-cookie");
     if (setCookie) this.cookie = setCookie.split(";")[0]!;
     const texto = await r.text();
-    const datos = texto ? JSON.parse(texto) : null;
+    const datos = texto && (r.headers.get("content-type") ?? "").includes("json") ? JSON.parse(texto) : texto || null;
     return { status: r.status, datos, headers: r.headers };
   }
 

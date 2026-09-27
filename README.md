@@ -12,7 +12,7 @@ Al registrarse, el usuario dice qué negocio tiene y el sistema se arma solo: ac
 | 1 · Alta automática | Acceso por WhatsApp, catálogo, búsqueda, motor de plantillas, tipos nuevos por IA, pantallas de registro | Listo y probado |
 | 2 · Vender | Productos, precios, venta por peso, código de barras, cobro con vuelto, pago mixto, fiado, caja, gastos, anulaciones | Listo y probado |
 | 3 · Control | Proveedores y compras, reportes por periodo, recordatorios de fiado por WhatsApp | Pendiente |
-| 4 · SRI | Factura y nota de crédito electrónicas | Pendiente |
+| 4 · SRI | Factura y nota de crédito electrónicas, firma XAdES-BES, envío y autorización con reintentos, RIDE para compartir | Listo y probado (con un SRI simulado; falta la prueba en el ambiente de pruebas real del SRI) |
 | 5 · Negocio | Planes y cobro recurrente con Kushki, panel de administración | Pendiente (el equipo y los roles ya funcionan) |
 
 ## Estructura
@@ -20,7 +20,7 @@ Al registrarse, el usuario dice qué negocio tiene y el sistema se arma solo: ac
 ```
 data/            catalogo_plantillas_negocios.xlsx — fuente del catálogo (módulos, familias, 216 tipos)
 db/
-  migrations/    esquema en orden (0001 … 0008)
+  migrations/    esquema en orden (0001 … 0009)
   seed/          catalogo.sql — GENERADO desde el Excel, no editar a mano
   tools/         generar_seed.py
   tests/         pruebas en SQL (cada una en una transacción que se revierte)
@@ -48,9 +48,23 @@ Sin dependencias de ejecución: usa `node:http`, `node:crypto` y un cliente prop
 | `GET/POST /api/categorias`, `GET/POST/PATCH /api/productos`, `POST /api/productos/:id/stock` | Catálogo del negocio |
 | `POST/GET /api/ventas`, `GET /api/ventas/:id`, `POST /api/ventas/:id/anular`, `GET /api/resumen/hoy` | Ventas |
 | `GET /api/caja`, `POST /api/caja/abrir`, `/cerrar`, `/movimientos`, `POST /api/gastos` | Caja |
-| `GET/POST /api/clientes`, `GET /api/clientes/:id`, `POST /api/clientes/:id/abonos` | Clientes y fiado |
+| `GET/POST /api/clientes`, `GET/PATCH /api/clientes/:id`, `POST /api/clientes/:id/abonos` | Clientes y fiado |
+| `GET/POST /api/sri/config`, `POST /api/sri/firma` | Datos del SRI y firma electrónica del negocio |
+| `GET /api/comprobantes`, `GET /api/comprobantes/:id`, `POST /api/comprobantes/:id/enviar`, `/reemitir`, `POST /api/ventas/:id/facturar` | Facturas y notas de crédito |
+| `GET /api/c/:token`, `GET /api/c/:token/xml` | RIDE público (el enlace que se envía al cliente) y XML autorizado |
+| `POST /api/tareas/sri` | Reintentos programados (Cloud Scheduler, con `ALCIEN_TOKEN_TAREAS`) |
 
 Reglas de dinero (en la base, `app.registrar_venta`): el precio incluye IVA; base e IVA se calculan por línea; los pagos deben sumar el total; el cajero no cambia precios, no da descuentos ni anula; una venta anulada devuelve stock y revierte el fiado.
+
+## Facturación electrónica (SRI)
+
+Cada negocio factura con **su propio RUC y su propia firma**. El dueño sube su `.p12` desde la app (Reportes → Facturación electrónica); la API la abre, la valida y la guarda cifrada (AES-256-GCM con `ALCIEN_CLAVE_FIRMAS`, atada al negocio). Nunca se devuelve.
+
+- **Emisión:** al cobrar con "Factura", en la misma transacción de la venta se reserva el número, se arma el XML (factura 1.1.0 / nota de crédito 1.1.0) y se firma (XAdES-BES, RSA-SHA1). Si algo falla, la venta no se guarda.
+- **Envío:** después de confirmar la venta se manda a recepción y autorización del SRI. Si el SRI no responde, queda pendiente y se reintenta con espera creciente (cada minuto dentro del servicio y con la tarea programada). La venta nunca espera al SRI.
+- **Reglas:** consumidor final solo hasta $50; desde 2026 una factura a consumidor final no se anula (Resolución NAC-DGERCGC25-00000014); anular una factura autorizada emite nota de crédito; una devuelta o no autorizada se vuelve a emitir con otro número.
+- **Sin librerías:** lector de `.p12` (PBES2/AES, 3DES y RC2 de las firmas antiguas), C14N y XAdES propios en `apps/api/src/sri/`. Las pruebas verifican la firma con una implementación independiente (`lxml` + `cryptography`) y el XML contra los XSD oficiales del SRI.
+- **Ambientes:** cada negocio empieza en **pruebas**. Cuando el SRI lo habilite, cambia a producción desde la app.
 
 ## Correr en local
 
@@ -76,9 +90,10 @@ En desarrollo el código de acceso aparece en pantalla ("Modo de prueba"); en pr
 ## Pruebas
 
 ```bash
-bash db/scripts/test.sh            # 7 archivos de pruebas SQL
-bash apps/api/scripts/test.sh      # 14 pruebas de la API contra PostgreSQL real
-BASE=http://localhost:8080 node e2e/flujo-venta.mjs   # recorrido completo en navegador
+bash db/scripts/test.sh            # 8 archivos de pruebas SQL
+bash apps/api/scripts/test.sh      # 22 pruebas de la API contra PostgreSQL real (con Python + lxml + cryptography verifica la firma)
+node e2e/sri-falso.mjs &           # SRI de mentira para el recorrido (API con SRI_URL_PRUEBAS=http://127.0.0.1:9099/ws)
+BASE=http://localhost:8080 node e2e/flujo-venta.mjs   # recorrido completo en navegador, incluida una factura
 ```
 
 La CI de GitHub corre las tres en cada cambio y guarda las capturas del recorrido.
@@ -86,9 +101,10 @@ La CI de GitHub corre las tres en cada cambio y guarda las capturas del recorrid
 ## Desplegar en Google Cloud
 
 1. Cloud SQL (PostgreSQL 16): crear la base, correr las migraciones y el seed con un usuario administrador, y crear `alcien_api` con `db/scripts/crear_usuario_api.sh`.
-2. Secret Manager: `ALCIEN_SECRETO_CODIGOS` (32+ caracteres aleatorios), `PGPASSWORD`, `WHATSAPP_TOKEN`, `GEMINI_API_KEY`.
+2. Secret Manager: `ALCIEN_SECRETO_CODIGOS` (32+ caracteres aleatorios), `ALCIEN_CLAVE_FIRMAS` (`openssl rand -base64 32`), `ALCIEN_TOKEN_TAREAS`, `PGPASSWORD`, `WHATSAPP_TOKEN`, `GEMINI_API_KEY`.
 3. Cloud Run: `gcloud run deploy alcien --source . --region us-east1` con la conexión a Cloud SQL (`PGHOST=/cloudsql/PROYECTO:REGION:INSTANCIA`) y las variables de `.env.example`.
-4. La API se niega a arrancar en producción sin secreto de códigos o con los códigos en consola.
+4. Cloud Scheduler: `POST https://…/api/tareas/sri` cada 5 minutos con `Authorization: Bearer $ALCIEN_TOKEN_TAREAS` (reintenta envíos al SRI aunque Cloud Run no tenga CPU entre peticiones).
+5. La API se niega a arrancar en producción sin secreto de códigos, sin clave de firmas o con los códigos en consola.
 
 ## Cambiar el catálogo
 
@@ -103,6 +119,8 @@ Los negocios existentes no cambian: al registrarse recibieron una copia.
 - Generar `package-lock.json` en la primera instalación con internet y subirlo.
 - Verificar el tipado de la web en la primera corrida de CI (el paso está marcado para no bloquear).
 - Plantilla de autenticación de WhatsApp aprobada por Meta y número verificado.
-- Confirmar con el contador el tratamiento de IVA por producto y régimen RIMPE antes de la etapa 4.
+- Probar una factura real en el ambiente de pruebas del SRI con una firma real (la CI usa un SRI simulado).
+- Confirmar con el contador: IVA por producto, facturas de negocios populares RIMPE y formas de pago del fiado.
+- Envío del RIDE por correo (hoy se comparte por enlace y WhatsApp).
 
 Nunca subas firmas electrónicas (`.p12`), contraseñas ni claves: van en Secret Manager.

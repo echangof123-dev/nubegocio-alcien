@@ -14,6 +14,14 @@ const limpieza = setInterval(() => {
 }, 60 * 60_000);
 limpieza.unref();
 
+// Reintentos de envío al SRI (además de la tarea programada POST /api/tareas/sri)
+if (cfg.sri.intervaloSeg > 0) {
+  const sri = setInterval(() => {
+    app.sri.procesarPendientes().catch((e) => log("error", "reintentos SRI fallaron", { error: String(e) }));
+  }, cfg.sri.intervaloSeg * 1000);
+  sri.unref();
+}
+
 // Cloud Run envía SIGTERM antes de apagar la instancia
 for (const senal of ["SIGTERM", "SIGINT"] as const) {
   process.on(senal, () => {

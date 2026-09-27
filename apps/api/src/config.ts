@@ -20,6 +20,15 @@ export interface Config {
   ia: { proveedor: "ninguno" | "gemini"; apiKey?: string; modelo: string };
   /** Carpeta de la app web ya compilada, para servirla desde el mismo servicio. */
   webDir?: string;
+  sri: {
+    /** 32 bytes para cifrar las firmas electrónicas guardadas (ALCIEN_CLAVE_FIRMAS en base64). */
+    claveFirmas: Buffer;
+    /** Token de la tarea programada que reintenta envíos (Cloud Scheduler). */
+    tokenTareas?: string;
+    /** Cada cuántos segundos se reintentan los envíos pendientes dentro del servicio (0 = nunca). */
+    intervaloSeg: number;
+    urls: Record<number, string>;
+  };
 }
 
 export function cargarConfig(env = process.env): Config {
@@ -36,6 +45,19 @@ export function cargarConfig(env = process.env): Config {
   if (prod && whatsappProveedor === "consola") {
     throw new Error("En producción los códigos deben enviarse por WhatsApp (WHATSAPP_PROVEEDOR=meta)");
   }
+
+  const claveTexto = env.ALCIEN_CLAVE_FIRMAS ?? "";
+  let claveFirmas: Buffer;
+  if (claveTexto) {
+    claveFirmas = Buffer.from(claveTexto, "base64");
+    if (claveFirmas.length !== 32) throw new Error("ALCIEN_CLAVE_FIRMAS debe ser 32 bytes en base64 (openssl rand -base64 32)");
+  } else if (prod) {
+    throw new Error("Falta ALCIEN_CLAVE_FIRMAS: sin ella no se pueden guardar firmas electrónicas");
+  } else {
+    claveFirmas = Buffer.alloc(32, 7);   // solo desarrollo y pruebas
+  }
+  const tokenTareas = env.ALCIEN_TOKEN_TAREAS || undefined;
+  if (tokenTareas && tokenTareas.length < 32) throw new Error("ALCIEN_TOKEN_TAREAS debe tener al menos 32 caracteres");
 
   return {
     entorno,
@@ -64,5 +86,14 @@ export function cargarConfig(env = process.env): Config {
       modelo: env.GEMINI_MODELO ?? "gemini-2.5-flash",
     },
     webDir: env.ALCIEN_WEB_DIR,
+    sri: {
+      claveFirmas,
+      tokenTareas,
+      intervaloSeg: Number(env.SRI_INTERVALO_SEG ?? 60),
+      urls: {
+        1: env.SRI_URL_PRUEBAS ?? "https://celcer.sri.gob.ec/comprobantes-electronicos-ws",
+        2: env.SRI_URL_PRODUCCION ?? "https://cel.sri.gob.ec/comprobantes-electronicos-ws",
+      },
+    },
   };
 }

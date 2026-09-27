@@ -1,11 +1,15 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, mensajeDe } from "../api";
-import type { Cliente, InfoNegocio, LineaCarrito } from "../tipos";
+import type { Cliente, EstadoSri as TEstadoSri, InfoNegocio, LineaCarrito } from "../tipos";
 import { tieneModulo } from "../tipos";
 import { cantidad as fmtCantidad, dinero, parsearNumero, redondear } from "../formato";
 import { Aviso, CampoMonto, Dialogo } from "../componentes/basicos";
 import { IBasura, ICheckCirculo, IMas, IMenos, IVolver } from "../componentes/iconos";
 import { totalCarrito } from "./Vender";
+import { EstadoSri, enlaceRide, enlaceWhatsApp, useSeguimiento } from "../componentes/comprobante";
+
+/** Límite del SRI para facturar a consumidor final. */
+const LIMITE_CONSUMIDOR_FINAL = 50;
 
 type Props = {
   info: InfoNegocio;
@@ -16,7 +20,10 @@ type Props = {
 
 const NOMBRES: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta", deuna: "DeUna", fiado: "Fiado" };
 
-interface Hecha { numero: number; total: number; vuelto: number; metodo: string; cliente?: string }
+interface Hecha {
+  numero: number; total: number; vuelto: number; metodo: string; cliente?: Cliente | null;
+  factura?: { id: string; numero: string } | null;
+}
 
 export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
   const metodos = [...info.negocio.metodos_pago, ...(tieneModulo(info, "M14") ? ["fiado"] : [])];
@@ -28,6 +35,13 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [hecha, setHecha] = useState<Hecha | null>(null);
+  const [sri, setSri] = useState<TEstadoSri | null>(null);
+  const [comprobante, setComprobante] = useState<"nota" | "factura">("nota");
+
+  useEffect(() => {
+    if (!tieneModulo(info, "M19")) return;
+    api<TEstadoSri>("GET", "/sri/config").then(setSri).catch(() => {});
+  }, [info]);
 
   const total = totalCarrito(carrito);
   const recibidoN = parsearNumero(recibido);
@@ -44,18 +58,24 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
     e.preventDefault();
     setError(null);
     if (metodo === "fiado" && !cliente) { setElegirCliente(true); return; }
+    if (comprobante === "factura" && cliente && !cliente.identificacion) { setElegirCliente(true); return; }
+    if (comprobante === "factura" && !cliente && total > LIMITE_CONSUMIDOR_FINAL) {
+      setError(`Las facturas de más de $${LIMITE_CONSUMIDOR_FINAL} necesitan la cédula o RUC del cliente.`);
+      return;
+    }
     if (metodo === "efectivo" && recibidoN !== null && recibidoN < total) { setError("El efectivo recibido no alcanza."); return; }
     setOcupado(true);
     try {
       const pago: Record<string, unknown> = { metodo, monto: total };
       if (metodo === "efectivo") pago.recibido = recibidoN ?? total;
       if (referencia.trim() && metodo !== "efectivo" && metodo !== "fiado") pago.referencia = referencia.trim();
-      const r = await api<{ venta: { numero: number; total: number; vuelto: number } }>("POST", "/ventas", {
+      const r = await api<{ venta: { numero: number; total: number; vuelto: number }; factura: { id: string; numero: string } | null }>("POST", "/ventas", {
         items: carrito.map((l) => ({ producto_id: l.producto.id, cantidad: l.cantidad })),
         pagos: [pago],
         cliente_id: cliente?.id,
+        comprobante,
       });
-      setHecha({ ...r.venta, metodo, cliente: cliente?.nombre });
+      setHecha({ ...r.venta, metodo, cliente, factura: r.factura });
       setCarrito(() => []);
     } catch (err) {
       setError(mensajeDe(err));
@@ -69,12 +89,13 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
       <main className="pagina-simple" style={{ justifyContent: "center", textAlign: "center", alignItems: "center" }}>
         <span style={{ color: "var(--success)" }}><ICheckCirculo tam={64} /></span>
         <h1>¡Venta registrada!</h1>
-        <p className="muted">Venta N.º {hecha.numero} · {NOMBRES[hecha.metodo]}{hecha.cliente ? ` · ${hecha.cliente}` : ""}</p>
+        <p className="muted">Venta N.º {hecha.numero} · {NOMBRES[hecha.metodo]}{hecha.cliente ? ` · ${hecha.cliente.nombre}` : ""}</p>
         <p className="monto-grande">{dinero(hecha.total)}</p>
         {hecha.metodo === "efectivo" && hecha.vuelto > 0 && (
           <div className="vuelto" style={{ width: "100%" }}><span>Vuelto</span><strong>{dinero(hecha.vuelto)}</strong></div>
         )}
-        {hecha.metodo === "fiado" && <Aviso tipo="info">Quedó anotado en los fiados de {hecha.cliente}.</Aviso>}
+        {hecha.metodo === "fiado" && <Aviso tipo="info">Quedó anotado en los fiados de {hecha.cliente?.nombre}.</Aviso>}
+        {hecha.factura && <FacturaHecha id={hecha.factura.id} negocio={info.negocio.nombre} celular={hecha.cliente?.celular} />}
         <button className="boton bloque" onClick={() => navegar("/")}>Nueva venta</button>
       </main>
     );
@@ -154,6 +175,37 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
           </div>
         )}
 
+        {sri?.listo && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span className="etiqueta" id="comprobante">Comprobante</span>
+            <div className="opciones" role="group" aria-labelledby="comprobante">
+              <button type="button" className={`opcion${comprobante === "nota" ? " activa" : ""}`} aria-pressed={comprobante === "nota"}
+                onClick={() => setComprobante("nota")}>Nota de venta</button>
+              <button type="button" className={`opcion${comprobante === "factura" ? " activa" : ""}`} aria-pressed={comprobante === "factura"}
+                onClick={() => { setComprobante("factura"); setError(null); }}>Factura</button>
+            </div>
+            {comprobante === "factura" && metodo !== "fiado" && (
+              cliente ? (
+                <div className="item-opcion activo">
+                  <span className="textos"><strong>{cliente.nombre}</strong><span>{cliente.identificacion ?? "Falta su cédula o RUC"}</span></span>
+                  <button type="button" className="boton texto" onClick={() => setCliente(null)}>Consumidor final</button>
+                </div>
+              ) : (
+                <div className="item-opcion">
+                  <span className="textos">
+                    <strong>Consumidor final</strong>
+                    <span>{total > LIMITE_CONSUMIDOR_FINAL ? `Más de $${LIMITE_CONSUMIDOR_FINAL}: pide cédula o RUC` : "Sin datos del cliente"}</span>
+                  </span>
+                  <button type="button" className="boton texto" onClick={() => setElegirCliente(true)}>Con datos</button>
+                </div>
+              )
+            )}
+            {sri.config?.ambiente === 1 && comprobante === "factura" && (
+              <p className="muted" style={{ fontSize: 13 }}>Ambiente de pruebas: la factura no tiene validez tributaria.</p>
+            )}
+          </div>
+        )}
+
         {metodo === "fiado" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <span className="etiqueta">¿A quién le fías?</span>
@@ -170,23 +222,57 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
 
         {error && <Aviso tipo="error">{error}</Aviso>}
         <button className="boton bloque" style={{ minHeight: 56, fontSize: 17 }} disabled={ocupado}>
-          {ocupado ? "Registrando…" : metodo === "fiado" ? `Guardar fiado de ${dinero(total)}` : `Cobrar ${dinero(total)}`}
+          {ocupado ? (comprobante === "factura" ? "Firmando la factura…" : "Registrando…")
+            : metodo === "fiado" ? `Guardar fiado de ${dinero(total)}` : `Cobrar ${dinero(total)}`}
         </button>
       </form>
 
       {elegirCliente && (
-        <ElegirCliente alCerrar={() => setElegirCliente(false)} alElegir={(c) => { setCliente(c); setElegirCliente(false); }} />
+        <ElegirCliente paraFactura={comprobante === "factura"} inicial={cliente}
+          alCerrar={() => setElegirCliente(false)} alElegir={(c) => { setCliente(c); setElegirCliente(false); }} />
       )}
     </main>
   );
 }
 
-export function ElegirCliente({ alCerrar, alElegir }: { alCerrar: () => void; alElegir: (c: Cliente) => void }) {
+function FacturaHecha({ id, negocio, celular }: { id: string; negocio: string; celular?: string | null }) {
+  const c = useSeguimiento(id);
+  if (!c) return <p className="muted">Factura firmada. Enviando al SRI…</p>;
+  const problema = c.estado === "devuelto" || c.estado === "no_autorizado";
+  return (
+    <div className="tarjeta" style={{ width: "100%", boxShadow: "none", border: "1px solid var(--border)", textAlign: "left" }}>
+      <div className="fila">
+        <strong>Factura {c.numero}</strong>
+        <EstadoSri estado={c.estado} />
+      </div>
+      {(c.estado === "firmado" || c.estado === "recibido") && (
+        <p className="muted" style={{ fontSize: 14 }}>
+          {c.mensajes[0]?.mensaje ?? "El SRI la está revisando."} Si tarda, se reintenta sola; también puedes verla en Facturación.
+        </p>
+      )}
+      {problema && <Aviso tipo="error">{c.mensajes[0]?.mensaje ?? "El SRI no la aceptó."} Revísala en Facturación.</Aviso>}
+      {c.estado === "autorizado" && (
+        <div className="acciones-fila">
+          <a className="boton secundario pequeno" href={enlaceRide(c)} target="_blank" rel="noopener">Ver factura</a>
+          <a className="boton secundario pequeno" href={enlaceWhatsApp(c, negocio, celular)} target="_blank" rel="noopener">Enviar por WhatsApp</a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ElegirCliente({ alCerrar, alElegir, paraFactura = false, inicial = null }: {
+  alCerrar: () => void; alElegir: (c: Cliente) => void; paraFactura?: boolean; inicial?: Cliente | null;
+}) {
   const [q, setQ] = useState("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [nuevo, setNuevo] = useState(false);
-  const [nombre, setNombre] = useState("");
-  const [celular, setCelular] = useState("");
+  // Para facturar, un cliente sin cédula se completa antes de elegirlo
+  const [editando, setEditando] = useState<Cliente | "nuevo" | null>(paraFactura && inicial && !inicial.identificacion ? inicial : null);
+  const [nombre, setNombre] = useState(inicial?.nombre ?? "");
+  const [celular, setCelular] = useState(inicial?.celular ?? "");
+  const [identificacion, setIdentificacion] = useState("");
+  const [correo, setCorreo] = useState(inicial?.correo ?? "");
+  const [direccion, setDireccion] = useState(inicial?.direccion ?? "");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -196,46 +282,87 @@ export function ElegirCliente({ alCerrar, alElegir }: { alCerrar: () => void; al
     return () => clearTimeout(t);
   }, [q]);
 
-  async function crear(e: FormEvent) {
+  function elegir(c: Cliente) {
+    if (paraFactura && !c.identificacion) {
+      setEditando(c);
+      setNombre(c.nombre); setCelular(c.celular ?? ""); setCorreo(c.correo ?? ""); setDireccion(c.direccion ?? "");
+      setIdentificacion("");
+      return;
+    }
+    alElegir(c);
+  }
+
+  async function guardar(e: FormEvent) {
     e.preventDefault();
+    setError(null);
+    const datos = {
+      nombre, celular: celular || undefined, identificacion: identificacion || undefined,
+      correo: correo || undefined, direccion: direccion || undefined,
+    };
     try {
-      const r = await api<{ cliente: Cliente }>("POST", "/clientes", { nombre, celular: celular || undefined });
-      alElegir(r.cliente);
+      const r = editando && editando !== "nuevo"
+        ? await api<{ cliente: Cliente }>("PATCH", `/clientes/${editando.id}`, datos)
+        : await api<{ cliente: Cliente }>("POST", "/clientes", datos);
+      alElegir({ ...r.cliente, saldo: editando && editando !== "nuevo" ? editando.saldo : 0 });
     } catch (err) {
       setError(mensajeDe(err));
     }
   }
 
+  const pideId = paraFactura;
   return (
-    <Dialogo titulo={nuevo ? "Nuevo cliente" : "Elegir cliente"} alCerrar={alCerrar}>
-      {nuevo ? (
-        <form onSubmit={crear} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <Dialogo titulo={editando === "nuevo" ? "Nuevo cliente" : editando ? `Datos de ${editando.nombre}` : "Elegir cliente"} alCerrar={alCerrar}>
+      {editando ? (
+        <form onSubmit={guardar} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {editando !== "nuevo" && pideId && <Aviso tipo="info">Para facturarle falta su cédula o RUC.</Aviso>}
           <div className="campo">
-            <label htmlFor="cli-nombre">Nombre</label>
+            <label htmlFor="cli-nombre">{pideId ? "Nombre o razón social" : "Nombre"}</label>
             <input id="cli-nombre" className="entrada" value={nombre} onChange={(e) => setNombre(e.target.value)} />
           </div>
           <div className="campo">
-            <label htmlFor="cli-cel">Celular (para recordarle por WhatsApp)</label>
+            <label htmlFor="cli-id">Cédula o RUC{pideId ? "" : " (para facturarle)"}</label>
+            <input id="cli-id" className="entrada" inputMode="numeric" maxLength={20} value={identificacion} onChange={(e) => setIdentificacion(e.target.value.trim())} />
+          </div>
+          <div className="campo">
+            <label htmlFor="cli-cel">Celular (para enviarle la factura o recordarle por WhatsApp)</label>
             <input id="cli-cel" className="entrada" type="tel" inputMode="tel" value={celular} onChange={(e) => setCelular(e.target.value)} />
           </div>
+          {pideId && (
+            <>
+              <div className="campo">
+                <label htmlFor="cli-correo">Correo (opcional)</label>
+                <input id="cli-correo" className="entrada" type="email" inputMode="email" value={correo} onChange={(e) => setCorreo(e.target.value)} />
+              </div>
+              <div className="campo">
+                <label htmlFor="cli-dir">Dirección (opcional)</label>
+                <input id="cli-dir" className="entrada" maxLength={300} value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+              </div>
+            </>
+          )}
           {error && <Aviso tipo="error">{error}</Aviso>}
-          <button className="boton bloque" disabled={nombre.trim().length < 2}>Guardar cliente</button>
+          <button className="boton bloque" disabled={nombre.trim().length < 2 || (pideId && identificacion.length < 5)}>Guardar cliente</button>
         </form>
       ) : (
         <>
           <div className="campo">
             <label htmlFor="cli-buscar">Buscar</label>
-            <input id="cli-buscar" className="entrada" placeholder="Nombre o celular" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input id="cli-buscar" className="entrada" placeholder={paraFactura ? "Nombre, cédula o RUC" : "Nombre o celular"} value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <div className="lista-opciones">
             {clientes.map((c) => (
-              <button key={c.id} className="item-opcion" onClick={() => alElegir(c)}>
-                <span className="textos"><strong>{c.nombre}</strong><span>{c.saldo > 0 ? `Debe ${dinero(c.saldo)}` : c.celular ?? "Sin deudas"}</span></span>
+              <button key={c.id} className="item-opcion" onClick={() => elegir(c)}>
+                <span className="textos">
+                  <strong>{c.nombre}</strong>
+                  <span>{paraFactura ? (c.identificacion ?? "Sin cédula ni RUC") : c.saldo > 0 ? `Debe ${dinero(c.saldo)}` : c.celular ?? "Sin deudas"}</span>
+                </span>
               </button>
             ))}
             {clientes.length === 0 && <p className="muted">No hay clientes con ese nombre.</p>}
           </div>
-          <button className="boton secundario" onClick={() => { setNuevo(true); setNombre(q); }}>Nuevo cliente</button>
+          <button className="boton secundario" onClick={() => {
+            setEditando("nuevo");
+            if (/^\d{10}(\d{3})?$/.test(q)) { setIdentificacion(q); setNombre(""); } else setNombre(q);
+          }}>Nuevo cliente</button>
         </>
       )}
     </Dialogo>
