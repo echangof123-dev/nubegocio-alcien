@@ -100,14 +100,15 @@ La CI de GitHub corre las tres en cada cambio y guarda las capturas del recorrid
 
 ## Desplegar en Google Cloud
 
-Todo se hace con un script desde **Google Cloud Shell** (en el navegador, sin instalar nada):
+[![Abrir en Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/echangof123-dev/nubegocio-alcien&cloudshell_tutorial=deploy/TUTORIAL.md&show=terminal)
+
+El botón abre Google Cloud Shell con el código y una guía paso a paso. Ahí solo se corre:
 
 ```bash
-git clone https://github.com/echangof123-dev/nubegocio-alcien.git && cd nubegocio-alcien
-gcloud config set project TU-PROYECTO
 bash deploy/desplegar.sh
 ```
 
+Si no hay proyecto elegido, el script crea uno (`alcien-…`) y le vincula la cuenta de facturación.
 El script crea o actualiza, sin borrar nada: Cloud SQL (PostgreSQL 16, `db-f1-micro`, respaldos diarios), los secretos en Secret Manager (generados al azar, nunca salen de Google Cloud), la cuenta de servicio con permisos mínimos, las migraciones y el catálogo, la app en Cloud Run y la tarea de Cloud Scheduler que reintenta los envíos al SRI cada 5 minutos. Para publicar una versión nueva, se vuelve a correr.
 
 **Beta cerrada:** mientras Meta aprueba la plantilla de WhatsApp, la app corre con `WHATSAPP_PROVEEDOR=registro`: el código de acceso no llega por WhatsApp; queda en el registro del servidor y solo lo ve quien tiene acceso al proyecto (`bash deploy/ver-codigos.sh`). Con la plantilla aprobada: crear los secretos `alcien-whatsapp-token` y `alcien-whatsapp-numero` y correr `WHATSAPP_PROVEEDOR=meta bash deploy/desplegar.sh`.

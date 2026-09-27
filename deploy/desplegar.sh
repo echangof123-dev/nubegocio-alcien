@@ -3,9 +3,9 @@
 # + Cloud Scheduler (reintentos al SRI). Se puede correr las veces que haga falta: lo que ya existe
 # se deja como está y el código se actualiza.
 #
-# En Google Cloud Shell (https://shell.cloud.google.com):
-#   gcloud config set project TU-PROYECTO
+# En Google Cloud Shell (el botón "Abrir en Cloud Shell" del README lo deja todo listo):
 #   bash deploy/desplegar.sh
+# Si no hay proyecto elegido, crea uno y le vincula la facturación.
 #
 # Variables opcionales: REGION (us-east1), SERVICIO (alcien), INSTANCIA (alcien-db), TIER (db-f1-micro),
 # WHATSAPP_PROVEEDOR (registro | meta; con meta hacen falta los secretos alcien-whatsapp-token y
@@ -13,7 +13,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-PROYECTO="${PROYECTO:-$(gcloud config get-value project 2>/dev/null || true)}"
+PROYECTO="${PROYECTO:-}"
 REGION="${REGION:-us-east1}"
 SERVICIO="${SERVICIO:-alcien}"
 INSTANCIA="${INSTANCIA:-alcien-db}"
@@ -27,8 +27,52 @@ paso() { printf '\n\033[1;34m▸ %s\033[0m\n' "$*"; }
 ok() { printf '  \033[32m✔\033[0m %s\n' "$*"; }
 fallar() { printf '\n\033[1;31m✘ %s\033[0m\n' "$*" >&2; exit 1; }
 
-[[ -n "$PROYECTO" && "$PROYECTO" != "(unset)" ]] || fallar "Elige tu proyecto primero: gcloud config set project TU-PROYECTO"
+preguntar() {   # texto, valor por defecto → respuesta
+  local r
+  read -r -p "$1 [$2]: " r </dev/tty || true
+  printf '%s' "${r:-$2}"
+}
+
+# ---------- 0. Proyecto y facturación (se crean si hace falta) ----------
+if [[ -z "$PROYECTO" || "$PROYECTO" == "(unset)" ]]; then
+  paso "Proyecto de Google Cloud"
+  # Nunca se usa por sorpresa otro proyecto: solo se sugiere uno que se llame alcien…
+  ACTUAL="$(gcloud config get-value project 2>/dev/null || true)"
+  if [[ "$ACTUAL" == alcien* ]]; then EXISTENTES="$ACTUAL"; else
+    EXISTENTES="$(gcloud projects list --format='value(projectId)' --filter='projectId~^alcien' 2>/dev/null | head -1)"
+  fi
+  if [[ -n "$EXISTENTES" ]]; then
+    PROYECTO="$(preguntar "Encontré el proyecto $EXISTENTES. ¿Uso ese? Escribe otro ID si no" "$EXISTENTES")"
+  else
+    PROYECTO="$(preguntar "Nombre (ID) del proyecto nuevo" "alcien-$(openssl rand -hex 3)")"
+  fi
+  if ! gcloud projects describe "$PROYECTO" >/dev/null 2>&1; then
+    gcloud projects create "$PROYECTO" --name "Al Cien" --quiet || fallar "No se pudo crear el proyecto $PROYECTO (prueba con otro nombre)"
+    ok "proyecto $PROYECTO creado"
+  fi
+fi
 gcloud config set project "$PROYECTO" >/dev/null 2>&1
+
+FACTURACION="$(gcloud billing projects describe "$PROYECTO" --format='value(billingEnabled)' 2>/dev/null || true)"
+if [[ "$FACTURACION" != "True" ]]; then
+  paso "Facturación del proyecto"
+  mapfile -t CUENTAS < <(gcloud billing accounts list --filter=open=true --format='value(name.basename(),displayName)' 2>/dev/null)
+  if [[ ${#CUENTAS[@]} -eq 0 ]]; then
+    echo "  Tu cuenta de Google todavía no tiene una forma de pago en Google Cloud."
+    echo "  Créala aquí (tarjeta de crédito o débito) y vuelve a correr este comando:"
+    echo "    https://console.cloud.google.com/billing/create"
+    exit 1
+  fi
+  ELEGIDA="${CUENTAS[0]%%$'\t'*}"
+  if [[ ${#CUENTAS[@]} -gt 1 ]]; then
+    for i in "${!CUENTAS[@]}"; do echo "  $((i + 1)). ${CUENTAS[$i]//$'\t'/ · }"; done
+    N="$(preguntar "¿Con cuál cuenta de facturación pago?" 1)"
+    ELEGIDA="${CUENTAS[$((N - 1))]%%$'\t'*}"
+  fi
+  gcloud billing projects link "$PROYECTO" --billing-account "$ELEGIDA" --quiet >/dev/null ||
+    fallar "No se pudo activar la facturación. Hazlo en https://console.cloud.google.com/billing/linkedaccount?project=$PROYECTO"
+  ok "facturación activa"
+fi
 NUMERO_PROYECTO="$(gcloud projects describe "$PROYECTO" --format='value(projectNumber)')"
 CUENTA="${CUENTA_NOMBRE}@${PROYECTO}.iam.gserviceaccount.com"
 echo "Proyecto: $PROYECTO · Región: $REGION"
