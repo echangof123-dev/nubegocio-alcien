@@ -12,6 +12,7 @@ psql -X -q -v ON_ERROR_STOP=1 \
   -v usuario="$USUARIO" -v clave="$ALCIEN_API_PASSWORD" <<'SQL'
 select format('create role %I login nobypassrls in role alcien_app', :'usuario')
 where not exists (select 1 from pg_roles where rolname = :'usuario') \gexec
-select format('alter role %I with login nobypassrls password %L', :'usuario', :'clave') \gexec
+-- Sin NOBYPASSRLS aquí: en Cloud SQL solo un superusuario puede tocar ese atributo (ya viene así al crearlo)
+select format('alter role %I with login password %L', :'usuario', :'clave') \gexec
 SQL
 echo "Usuario $USUARIO listo."

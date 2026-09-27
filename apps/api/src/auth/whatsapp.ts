@@ -2,6 +2,9 @@
  * Envío del código de acceso.
  *   · consola: solo desarrollo; escribe el código en el registro.
  *   · meta: WhatsApp Cloud API con una plantilla de autenticación aprobada.
+ *   · registro: mientras Meta aprueba la plantilla. El código solo queda en el registro del
+ *     servidor (Cloud Logging), que ve el dueño de la cuenta de Google Cloud: sirve para una
+ *     beta cerrada, porque nadie más puede leer los códigos.
  */
 import type { Config } from "../config.js";
 
@@ -14,6 +17,12 @@ export class EnviadorConsola implements EnviadorCodigos {
   async enviar(celular: string, codigo: string) {
     this.ultimos.set(celular, codigo);
     console.log(JSON.stringify({ nivel: "info", msg: "código de acceso (solo desarrollo)", celular, codigo }));
+  }
+}
+
+export class EnviadorRegistro implements EnviadorCodigos {
+  async enviar(celular: string, codigo: string) {
+    console.log(JSON.stringify({ severity: "WARNING", message: "código de acceso", celular, codigo }));
   }
 }
 
@@ -52,5 +61,7 @@ export class EnviadorWhatsAppMeta implements EnviadorCodigos {
 }
 
 export function crearEnviador(cfg: Config["whatsapp"]): EnviadorCodigos {
-  return cfg.proveedor === "meta" ? new EnviadorWhatsAppMeta(cfg) : new EnviadorConsola();
+  if (cfg.proveedor === "meta") return new EnviadorWhatsAppMeta(cfg);
+  if (cfg.proveedor === "registro") return new EnviadorRegistro();
+  return new EnviadorConsola();
 }

@@ -16,7 +16,7 @@ export interface Config {
   secretoCodigos: string;
   /** Orígenes permitidos para peticiones que cambian datos (además del propio). */
   origenes: string[];
-  whatsapp: { proveedor: "consola" | "meta"; token?: string; phoneNumberId?: string; plantilla: string; version: string };
+  whatsapp: { proveedor: "consola" | "meta" | "registro"; token?: string; phoneNumberId?: string; plantilla: string; version: string };
   ia: { proveedor: "ninguno" | "gemini"; apiKey?: string; modelo: string };
   /** Carpeta de la app web ya compilada, para servirla desde el mismo servicio. */
   webDir?: string;
@@ -42,8 +42,12 @@ export function cargarConfig(env = process.env): Config {
   }
 
   const whatsappProveedor = (env.WHATSAPP_PROVEEDOR ?? (prod ? "meta" : "consola")) as Config["whatsapp"]["proveedor"];
+  if (!["consola", "meta", "registro"].includes(whatsappProveedor)) throw new Error("WHATSAPP_PROVEEDOR inválido");
   if (prod && whatsappProveedor === "consola") {
     throw new Error("En producción los códigos deben enviarse por WhatsApp (WHATSAPP_PROVEEDOR=meta)");
+  }
+  if (prod && whatsappProveedor === "registro" && env.ALCIEN_PERMITIR_CODIGOS_EN_REGISTRO !== "true") {
+    throw new Error("WHATSAPP_PROVEEDOR=registro en producción exige ALCIEN_PERMITIR_CODIGOS_EN_REGISTRO=true (beta cerrada)");
   }
 
   const claveTexto = env.ALCIEN_CLAVE_FIRMAS ?? "";

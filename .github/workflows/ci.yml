@@ -82,6 +82,22 @@ jobs:
           sleep 3
           BASE=http://localhost:8080 node e2e/flujo-venta.mjs
 
+      - name: Imagen de Docker en modo producción
+        run: |
+          docker build -t alcien .
+          docker run -d --name alcien --network host \
+            -e PGHOST=127.0.0.1 -e PGUSER=alcien_api -e PGPASSWORD=alcien-e2e -e PGDATABASE=alcien_e2e -e PORT=8090 \
+            -e WHATSAPP_PROVEEDOR=registro -e ALCIEN_PERMITIR_CODIGOS_EN_REGISTRO=true \
+            -e ALCIEN_SECRETO_CODIGOS="$(openssl rand -hex 32)" -e ALCIEN_CLAVE_FIRMAS="$(openssl rand -base64 32)" \
+            alcien
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8090/api/salud && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8090/api/salud
+          curl -fsS http://127.0.0.1:8090/ | grep -q "Al Cien"
+          # En producción el código de acceso no se devuelve: solo queda en el registro
+          curl -fsS -X POST -H 'content-type: application/json' -d '{"celular":"0991234599"}' http://127.0.0.1:8090/api/auth/codigo | grep -vq 'codigoDev'
+          docker logs alcien 2>&1 | grep -q "código de acceso"
+          docker rm -f alcien
+
       - name: Capturas del recorrido
         if: always()
         uses: actions/upload-artifact@v4

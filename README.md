@@ -100,11 +100,19 @@ La CI de GitHub corre las tres en cada cambio y guarda las capturas del recorrid
 
 ## Desplegar en Google Cloud
 
-1. Cloud SQL (PostgreSQL 16): crear la base, correr las migraciones y el seed con un usuario administrador, y crear `alcien_api` con `db/scripts/crear_usuario_api.sh`.
-2. Secret Manager: `ALCIEN_SECRETO_CODIGOS` (32+ caracteres aleatorios), `ALCIEN_CLAVE_FIRMAS` (`openssl rand -base64 32`), `ALCIEN_TOKEN_TAREAS`, `PGPASSWORD`, `WHATSAPP_TOKEN`, `GEMINI_API_KEY`.
-3. Cloud Run: `gcloud run deploy alcien --source . --region us-east1` con la conexión a Cloud SQL (`PGHOST=/cloudsql/PROYECTO:REGION:INSTANCIA`) y las variables de `.env.example`.
-4. Cloud Scheduler: `POST https://…/api/tareas/sri` cada 5 minutos con `Authorization: Bearer $ALCIEN_TOKEN_TAREAS` (reintenta envíos al SRI aunque Cloud Run no tenga CPU entre peticiones).
-5. La API se niega a arrancar en producción sin secreto de códigos, sin clave de firmas o con los códigos en consola.
+Todo se hace con un script desde **Google Cloud Shell** (en el navegador, sin instalar nada):
+
+```bash
+git clone https://github.com/echangof123-dev/nubegocio-alcien.git && cd nubegocio-alcien
+gcloud config set project TU-PROYECTO
+bash deploy/desplegar.sh
+```
+
+El script crea o actualiza, sin borrar nada: Cloud SQL (PostgreSQL 16, `db-f1-micro`, respaldos diarios), los secretos en Secret Manager (generados al azar, nunca salen de Google Cloud), la cuenta de servicio con permisos mínimos, las migraciones y el catálogo, la app en Cloud Run y la tarea de Cloud Scheduler que reintenta los envíos al SRI cada 5 minutos. Para publicar una versión nueva, se vuelve a correr.
+
+**Beta cerrada:** mientras Meta aprueba la plantilla de WhatsApp, la app corre con `WHATSAPP_PROVEEDOR=registro`: el código de acceso no llega por WhatsApp; queda en el registro del servidor y solo lo ve quien tiene acceso al proyecto (`bash deploy/ver-codigos.sh`). Con la plantilla aprobada: crear los secretos `alcien-whatsapp-token` y `alcien-whatsapp-numero` y correr `WHATSAPP_PROVEEDOR=meta bash deploy/desplegar.sh`.
+
+La API se niega a arrancar en producción sin secreto de códigos, sin clave de firmas o con los códigos en pantalla. La CI construye la imagen de Docker y la arranca en modo producción en cada cambio.
 
 ## Cambiar el catálogo
 
