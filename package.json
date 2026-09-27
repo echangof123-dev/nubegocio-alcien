@@ -3,7 +3,8 @@
   "private": true,
   "description": "Al Cien — tu negocio al cien. App de ventas, caja, inventario, fiados y facturación SRI para negocios pequeños. Un producto de Nubegocio.",
   "workspaces": [
-    "apps/*"
+    "apps/api",
+    "apps/web"
   ],
   "engines": {
     "node": ">=22"
@@ -11,6 +12,12 @@
   "scripts": {
     "db:reset": "bash db/scripts/reset.sh",
     "db:seed:generate": "python3 db/tools/generar_seed.py",
-    "db:test": "bash db/scripts/test.sh"
+    "db:test": "bash db/scripts/test.sh",
+    "api:test": "bash apps/api/scripts/test.sh",
+    "build": "npm run build -w @alcien/api && npm run build -w @alcien/web",
+    "e2e": "node e2e/flujo-venta.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0"
   }
 }

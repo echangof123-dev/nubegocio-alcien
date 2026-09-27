@@ -8,70 +8,101 @@ Al registrarse, el usuario dice qué negocio tiene y el sistema se arma solo: ac
 
 | Etapa | Contenido | Estado |
 | --- | --- | --- |
-| 0 · Base | Base de datos, seguridad por fila, migraciones, CI | Base de datos lista y probada |
-| 1 · Alta automática | Catálogo, búsqueda de tipo de negocio, motor de plantillas, tipos nuevos por IA | Lógica de base de datos lista y probada |
-| 1 · Alta automática | Acceso por WhatsApp, API y pantallas | Pendiente |
-| 2–5 | Vender, control, SRI, planes y cobro | Pendiente |
+| 0 · Base | Base de datos, seguridad por fila, API, CI, imagen para Cloud Run | Listo y probado |
+| 1 · Alta automática | Acceso por WhatsApp, catálogo, búsqueda, motor de plantillas, tipos nuevos por IA, pantallas de registro | Listo y probado |
+| 2 · Vender | Productos, precios, venta por peso, código de barras, cobro con vuelto, pago mixto, fiado, caja, gastos, anulaciones | Listo y probado |
+| 3 · Control | Proveedores y compras, reportes por periodo, recordatorios de fiado por WhatsApp | Pendiente |
+| 4 · SRI | Factura y nota de crédito electrónicas | Pendiente |
+| 5 · Negocio | Planes y cobro recurrente con Kushki, panel de administración | Pendiente (el equipo y los roles ya funcionan) |
 
 ## Estructura
 
 ```
-data/          catalogo_plantillas_negocios.xlsx — fuente del catálogo (módulos, familias, 216 tipos)
+data/            catalogo_plantillas_negocios.xlsx — fuente del catálogo (módulos, familias, 216 tipos)
 db/
-  migrations/  esquema en orden: base, catálogo, negocios, seguridad, motor de plantillas, búsqueda
-  seed/        catalogo.sql — GENERADO desde el Excel, no editar a mano
-  tools/       generar_seed.py
-  tests/       pruebas en SQL (cada una en una transacción que se revierte)
-  scripts/     migrate.sh, reset.sh, test.sh
-apps/api       API (Node + TypeScript) — siguiente paso
-apps/web       App web instalable (React + TypeScript) — siguiente paso
+  migrations/    esquema en orden (0001 … 0008)
+  seed/          catalogo.sql — GENERADO desde el Excel, no editar a mano
+  tools/         generar_seed.py
+  tests/         pruebas en SQL (cada una en una transacción que se revierte)
+  scripts/       migrate.sh, reset.sh, test.sh, crear_usuario_api.sh
+apps/api/        API en Node 22 + TypeScript, sin dependencias de ejecución
+apps/web/        App web instalable (React 19 + esbuild)
+e2e/             recorrido completo en navegador (Playwright)
+Dockerfile       imagen única para Cloud Run (API + web)
 ```
 
-## Cómo funciona la base de datos
+## La API
 
-- **`catalogo`**: módulos, planes, familias, matriz familia × módulo y tipos de negocio. Lo administra Nubegocio.
-- **`app`**: datos de cada negocio. Todas sus tablas tienen `negocio_id` y **seguridad por fila**: la API se conecta como `alcien_app` y solo ve el negocio fijado con `app.entrar_negocio(usuario, negocio)`.
-- **`auth`**: usuarios, códigos de acceso y sesiones.
+Sin dependencias de ejecución: usa `node:http`, `node:crypto` y un cliente propio de PostgreSQL (`apps/api/src/db/pgwire.ts`: SCRAM-SHA-256, TLS, socket Unix para Cloud SQL, consultas con parámetros). Si más adelante se prefiere el paquete `pg`, solo cambia ese archivo.
 
-Funciones principales:
+- **Sesión:** código de 6 dígitos por WhatsApp → cookie `HttpOnly` de 30 días. Solo se guardan hashes del código y del token.
+- **Negocio:** cada petición lleva `X-Negocio`; la API abre una transacción, verifica la membresía con `app.entrar_negocio` y la seguridad por fila de PostgreSQL filtra el resto.
+- **Protecciones:** límite de códigos por celular, por IP y global; 5 intentos por código; solo JSON; peticiones que cambian datos solo desde el propio origen; cabeceras de seguridad y CSP.
 
-| Función | Qué hace |
+| Rutas | Qué hacen |
 | --- | --- |
-| `catalogo.buscar_tipos(texto, límite)` | Busca el tipo de negocio sin tildes, con errores de escritura y frases como "vendo ropa" |
-| `app.crear_negocio(usuario, tipo, nombre, ruc)` | Alta automática completa en una transacción |
-| `app.entrar_negocio(usuario, negocio)` | Verifica membresía y fija el contexto (negocio, usuario, rol) |
-| `app.modulos_visibles()` | Módulos del negocio: activo, bloqueado por plan o sugerido |
-| `app.activar_modulo(m)` / `app.desactivar_modulo(m)` | Prende o apaga módulos respetando dependencias y núcleo |
-| `catalogo.registrar_tipo_ia(...)` | Guarda un tipo nuevo propuesto por la IA, pendiente de revisión |
+| `POST /api/auth/codigo`, `POST /api/auth/verificar`, `POST /api/auth/salir`, `GET/PATCH /api/yo` | Acceso sin contraseña |
+| `GET /api/tipos-negocio?q=`, `POST /api/tipos-negocio/sugerir` | Buscar el tipo de negocio; si no existe, la IA propone uno |
+| `POST /api/negocios`, `GET /api/negocio`, `PATCH /api/negocio/config`, `POST /api/negocio/modulos/:m` | Alta automática, datos y módulos |
+| `GET/POST /api/negocio/equipo`, `PATCH /api/negocio/equipo/:usuario` | Invitar cajeros, bodegueros y administradores por celular |
+| `GET/POST /api/categorias`, `GET/POST/PATCH /api/productos`, `POST /api/productos/:id/stock` | Catálogo del negocio |
+| `POST/GET /api/ventas`, `GET /api/ventas/:id`, `POST /api/ventas/:id/anular`, `GET /api/resumen/hoy` | Ventas |
+| `GET /api/caja`, `POST /api/caja/abrir`, `/cerrar`, `/movimientos`, `POST /api/gastos` | Caja |
+| `GET/POST /api/clientes`, `GET /api/clientes/:id`, `POST /api/clientes/:id/abonos` | Clientes y fiado |
 
-Regla de visibilidad: un módulo se ve si **su familia o el usuario lo prendió** y **el plan lo incluye**; si falta el plan, se muestra con candado. Una suscripción vencida baja a Gratis sin borrar datos.
+Reglas de dinero (en la base, `app.registrar_venta`): el precio incluye IVA; base e IVA se calculan por línea; los pagos deben sumar el total; el cajero no cambia precios, no da descuentos ni anula; una venta anulada devuelve stock y revierte el fiado.
 
 ## Correr en local
 
-Requisitos: PostgreSQL 16 (con `pg_trgm`, `unaccent`, `pgcrypto`, `citext`) y Python 3 con `openpyxl`.
+Requisitos: PostgreSQL 16 (con `pg_trgm`, `unaccent`, `pgcrypto`, `citext`), Node 22 y Python 3 con `openpyxl`.
 
 ```bash
-export PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres
+npm install
+export PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres   # usuario administrador
 
-python3 db/tools/generar_seed.py        # si cambiaste el Excel
-PGDATABASE=alcien_dev bash db/scripts/reset.sh   # base de desarrollo con catálogo
-bash db/scripts/test.sh                  # pruebas (usa la base alcien_test)
+# Base de desarrollo con catálogo y el usuario de la API
+PGDATABASE=alcien_dev bash db/scripts/reset.sh
+PGDATABASE=alcien_dev ALCIEN_API_PASSWORD=alcien-dev bash db/scripts/crear_usuario_api.sh
+
+# Compilar la web y arrancar la API (sirve la web en http://localhost:8080)
+npm run build -w @alcien/web
+cp .env.example .env   # revisa los valores
+set -a; . ./.env; set +a
+npm run dev -w @alcien/api
 ```
+
+En desarrollo el código de acceso aparece en pantalla ("Modo de prueba"); en producción llega por WhatsApp.
+
+## Pruebas
+
+```bash
+bash db/scripts/test.sh            # 7 archivos de pruebas SQL
+bash apps/api/scripts/test.sh      # 14 pruebas de la API contra PostgreSQL real
+BASE=http://localhost:8080 node e2e/flujo-venta.mjs   # recorrido completo en navegador
+```
+
+La CI de GitHub corre las tres en cada cambio y guarda las capturas del recorrido.
+
+## Desplegar en Google Cloud
+
+1. Cloud SQL (PostgreSQL 16): crear la base, correr las migraciones y el seed con un usuario administrador, y crear `alcien_api` con `db/scripts/crear_usuario_api.sh`.
+2. Secret Manager: `ALCIEN_SECRETO_CODIGOS` (32+ caracteres aleatorios), `PGPASSWORD`, `WHATSAPP_TOKEN`, `GEMINI_API_KEY`.
+3. Cloud Run: `gcloud run deploy alcien --source . --region us-east1` con la conexión a Cloud SQL (`PGHOST=/cloudsql/PROYECTO:REGION:INSTANCIA`) y las variables de `.env.example`.
+4. La API se niega a arrancar en producción sin secreto de códigos o con los códigos en consola.
 
 ## Cambiar el catálogo
 
-1. Edita `data/catalogo_plantillas_negocios.xlsx` (tipos, sinónimos, categorías, fichas).
-2. Corre `python3 db/tools/generar_seed.py`.
-3. Corre las pruebas y sube ambos archivos. La CI falla si el seed no coincide con el Excel.
+1. Edita `data/catalogo_plantillas_negocios.xlsx`.
+2. Corre `python3 db/tools/generar_seed.py` y las pruebas.
+3. Sube ambos archivos. La CI falla si el seed no coincide con el Excel.
 
 Los negocios existentes no cambian: al registrarse recibieron una copia.
 
-## Seguridad
+## Pendientes conocidos
 
-- Nunca subas firmas electrónicas (`.p12`), contraseñas ni claves: van en Secret Manager.
-- `db/scripts/reset.sh` se niega a borrar bases cuyo nombre contenga `prod`.
+- Generar `package-lock.json` en la primera instalación con internet y subirlo.
+- Verificar el tipado de la web en la primera corrida de CI (el paso está marcado para no bloquear).
+- Plantilla de autenticación de WhatsApp aprobada por Meta y número verificado.
+- Confirmar con el contador el tratamiento de IVA por producto y régimen RIMPE antes de la etapa 4.
 
-## Documentos de diseño
-
-- Documento de diseño del sistema (arquitectura, módulos, SRI, planes, hoja de ruta y backlog).
-- Marca Al Cien (sistema de diseño) y maquetas de pantallas.
+Nunca subas firmas electrónicas (`.p12`), contraseñas ni claves: van en Secret Manager.

@@ -5,8 +5,14 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  PGHOST: localhost
+  PGPORT: "5432"
+  PGUSER: postgres
+  PGPASSWORD: postgres
+
 jobs:
-  base-de-datos:
+  pruebas:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -17,11 +23,6 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 10
-    env:
-      PGHOST: localhost
-      PGPORT: "5432"
-      PGUSER: postgres
-      PGPASSWORD: postgres
     steps:
       - uses: actions/checkout@v4
 
@@ -29,14 +30,53 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Cliente de PostgreSQL
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
       - name: El seed coincide con el Excel
         run: |
           pip install openpyxl
           python3 db/tools/generar_seed.py
           git diff --exit-code db/seed/catalogo.sql || (echo "db/seed/catalogo.sql está desactualizado: corre python3 db/tools/generar_seed.py" && exit 1)
 
-      - name: Cliente de PostgreSQL
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-
       - name: Pruebas de base de datos
         run: bash db/scripts/test.sh
+
+      - name: Dependencias
+        run: npm install --no-audit --no-fund
+
+      - name: Tipos de la API
+        run: npm run typecheck -w @alcien/api
+
+      - name: Tipos de la web
+        # Primera corrida con @types/react: si falla, revisar y quitar continue-on-error
+        continue-on-error: true
+        run: npm run typecheck -w @alcien/web
+
+      - name: Pruebas de la API
+        run: bash apps/api/scripts/test.sh
+
+      - name: Compilar API y web
+        run: npm run build
+
+      - name: Recorrido completo en navegador
+        run: |
+          npx playwright install --with-deps chromium
+          PGDATABASE=alcien_e2e bash db/scripts/reset.sh
+          PGDATABASE=alcien_e2e ALCIEN_API_PASSWORD=alcien-e2e bash db/scripts/crear_usuario_api.sh
+          (cd apps/api && echo '{"type":"module"}' > dist/package.json)
+          ALCIEN_ENTORNO=desarrollo PGUSER=alcien_api PGPASSWORD=alcien-e2e PGDATABASE=alcien_e2e \
+            ALCIEN_WEB_DIR=apps/web/dist PORT=8080 node apps/api/dist/main.js &
+          sleep 3
+          BASE=http://localhost:8080 node e2e/flujo-venta.mjs
+
+      - name: Capturas del recorrido
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas
+          path: e2e/capturas

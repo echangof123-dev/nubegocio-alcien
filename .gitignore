@@ -10,3 +10,4 @@ coverage/
 *.p12
 *.pfx
 secrets/
+e2e/capturas/
