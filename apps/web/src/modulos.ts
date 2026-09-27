@@ -10,6 +10,10 @@ export interface PantallaModulo {
 }
 
 export const PANTALLAS: PantallaModulo[] = [
+  { modulo: "M09", ruta: "/mesas", nombre: "Mesas", descripcion: "Cuentas abiertas, comandas y cobro por mesa" },
+  { modulo: "M10", ruta: "/pedidos", nombre: "Pedidos", descripcion: "Para llevar y a domicilio" },
+  { modulo: "M09|M10", ruta: "/cocina", nombre: "Cocina", descripcion: "Lo que hay que preparar" },
+  { modulo: "M08", ruta: "/recetas", nombre: "Recetas", descripcion: "Insumos y costo de cada plato" },
   { modulo: "M14", ruta: "/fiados", nombre: "Fiados", descripcion: "Quién te debe y sus abonos" },
   { modulo: "M15", ruta: "/compras", nombre: "Compras", descripcion: "Proveedores, compras y lo que debes" },
   { modulo: "M16", ruta: "/lotes", nombre: "Por vencer", descripcion: "Lotes vencidos o por vencer" },
@@ -24,10 +28,11 @@ export const INCLUIDOS: Record<string, string> = {
   M07: "En Vender y Productos", M21: "En Reportes",
 };
 
-export const tienePantalla = (modulo: string) => PANTALLAS.some((p) => p.modulo === modulo) || modulo in INCLUIDOS;
+export const tienePantalla = (modulo: string) => PANTALLAS.some((p) => p.modulo.split("|").includes(modulo)) || modulo in INCLUIDOS;
 
+/** Una pantalla con "M09|M10" aparece si el negocio tiene cualquiera de los dos. */
 export function pantallasActivas(info: InfoNegocio): PantallaModulo[] {
-  return PANTALLAS.filter((p) => tieneModulo(info, p.modulo));
+  return PANTALLAS.filter((p) => p.modulo.split("|").some((m) => tieneModulo(info, m)));
 }
 
 /** "productos" → "Productos"; "platos" → "Platos" */

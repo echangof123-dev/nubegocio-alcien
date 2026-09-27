@@ -84,6 +84,7 @@ jobs:
             SRI_URL_PRUEBAS=http://127.0.0.1:9099/ws ALCIEN_WEB_DIR=apps/web/dist PORT=8080 node apps/api/dist/main.js &
           sleep 3
           BASE=http://localhost:8080 node e2e/flujo-venta.mjs
+          BASE=http://localhost:8080 node e2e/flujo-restaurante.mjs
 
       - name: Imagen de Docker en modo producción
         run: |

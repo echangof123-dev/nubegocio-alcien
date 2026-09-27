@@ -3,7 +3,8 @@ import { noEncontrado, prohibido } from "../http/errores.js";
 import { booleano, numero, numeroOpcional, objeto, texto, textoOpcional, uuid, uuidOpcional } from "../http/validar.js";
 
 const COLUMNAS = `p.id, p.nombre, p.categoria_id, c.nombre as categoria, p.unidad, p.precio, p.costo, p.iva,
-  p.codigo_barras, p.maneja_stock, p.stock, p.stock_minimo, p.variantes, p.es_ejemplo, p.activo`;
+  p.codigo_barras, p.maneja_stock, p.stock, p.stock_minimo, p.variantes, p.es_ejemplo, p.activo, p.tipo,
+  exists (select 1 from app.receta r where r.producto_id = p.id) as tiene_receta`;
 
 export function rutasProductos(r: Router) {
   r.negocio("GET", "/categorias", async (_p, { db }) => {
@@ -27,14 +28,17 @@ export function rutasProductos(r: Router) {
   r.negocio("GET", "/productos", async (p, { db }) => {
     const q = (p.query.get("q") ?? "").trim().slice(0, 60);
     const categoria = uuidOpcional(p.query.get("categoria"), "La categoría");
+    // Por defecto solo lo que se vende; ?todos=1 incluye los insumos, ?tipo=insumo solo insumos
+    const tipo = p.query.get("todos") === "1" ? null : p.query.get("tipo") === "insumo" ? "insumo" : "venta";
     const { rows } = await db.query(
       `select ${COLUMNAS}
        from app.producto p left join app.categoria c on c.id = p.categoria_id
        where p.activo
          and ($1 = '' or catalogo.normalizar(p.nombre) like '%' || catalogo.normalizar($1) || '%' or p.codigo_barras = $1)
          and ($2::uuid is null or p.categoria_id = $2)
+         and ($3::text is null or p.tipo = $3)
        order by c.orden nulls last, p.nombre
-       limit 500`, [q, categoria]);
+       limit 500`, [q, categoria, tipo]);
     return { productos: rows };
   });
 
@@ -59,13 +63,14 @@ export function rutasProductos(r: Router) {
       c.maneja_stock === undefined ? true : booleano(c.maneja_stock, "Maneja stock"),
       numeroOpcional(c.stock_minimo, "El stock mínimo", { min: 0, decimales: 3 }),
       textoOpcional(c.variantes, "Las variantes", { max: 200 }),
+      c.tipo === undefined ? "venta" : (c.tipo === "insumo" ? "insumo" : "venta"),
     ];
     if (rol === "bodeguero" && valores[3] !== null) throw prohibido("Solo el dueño o un administrador ponen precios");
     const stockInicial = numeroOpcional(c.stock_inicial, "El stock inicial", { min: 0, decimales: 3 });
 
     const { rows } = await db.query<{ id: string }>(
-      `insert into app.producto (negocio_id, nombre, categoria_id, unidad, precio, costo, codigo_barras, maneja_stock, stock_minimo, variantes)
-       values (app.negocio_actual(), $1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`, valores);
+      `insert into app.producto (negocio_id, nombre, categoria_id, unidad, precio, costo, codigo_barras, maneja_stock, stock_minimo, variantes, tipo)
+       values (app.negocio_actual(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`, valores);
     const id = rows[0]!.id;
     if (stockInicial && valores[6]) {
       await db.query("select app.mover_stock($1, 'inicial', $2, null, 'Stock inicial', $3)", [id, stockInicial, valores[4]]);
@@ -92,6 +97,7 @@ export function rutasProductos(r: Router) {
     if (c.maneja_stock !== undefined) campos.push(["maneja_stock", booleano(c.maneja_stock, "Maneja stock")]);
     if (c.stock_minimo !== undefined) campos.push(["stock_minimo", numeroOpcional(c.stock_minimo, "El stock mínimo", { min: 0, decimales: 3 })]);
     if (c.activo !== undefined) campos.push(["activo", booleano(c.activo, "Activo")]);
+    if (c.tipo !== undefined) campos.push(["tipo", c.tipo === "insumo" ? "insumo" : "venta"]);
 
     if (campos.length) {
       const sets = campos.map(([k], i) => `${k} = $${i + 2}`).join(", ");

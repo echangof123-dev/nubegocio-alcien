@@ -17,6 +17,11 @@ import { Modulos } from "./pantallas/Modulos";
 import { Compras } from "./pantallas/Compras";
 import { Cotizaciones } from "./pantallas/Cotizaciones";
 import { Equipo } from "./pantallas/Equipo";
+import { Mesas } from "./pantallas/Mesas";
+import { Cuenta } from "./pantallas/Cuenta";
+import { Cocina } from "./pantallas/Cocina";
+import { Pedidos } from "./pantallas/Pedidos";
+import { Recetas } from "./pantallas/Recetas";
 import { PANTALLAS, titulo } from "./modulos";
 
 function useRuta(): [string, (r: string) => void] {
@@ -142,6 +147,10 @@ export function App() {
     case "/lotes": pantalla = <Compras info={info} avisar={avisar} inicial="lotes" />; break;
     case "/cotizaciones": pantalla = <Cotizaciones info={info} avisar={avisar} />; break;
     case "/equipo": pantalla = <Equipo info={info} avisar={avisar} />; break;
+    case "/mesas": pantalla = <Mesas info={info} navegar={navegar} avisar={avisar} />; break;
+    case "/cocina": pantalla = <Cocina avisar={avisar} />; break;
+    case "/pedidos": pantalla = <Pedidos info={info} avisar={avisar} />; break;
+    case "/recetas": pantalla = <Recetas info={info} avisar={avisar} />; break;
     case "/reportes":
       pantalla = <Reportes info={info} avisar={avisar} alSalir={salir} navegar={navegar}
         alCambiarNegocio={sesion.negocios.length > 1 ? () => {
@@ -152,7 +161,9 @@ export function App() {
           navegar("/");
         } : undefined} />;
       break;
-    default: pantalla = <Vender info={info} carrito={carrito} setCarrito={setCarrito} navegar={navegar} avisar={avisar} />;
+    default:
+      if (ruta.startsWith("/cuenta/")) { pantalla = <Cuenta key={ruta} id={ruta.slice(8)} info={info} navegar={navegar} avisar={avisar} />; break; }
+      pantalla = <Vender info={info} carrito={carrito} setCarrito={setCarrito} navegar={navegar} avisar={avisar} />;
   }
 
   return (
@@ -170,7 +181,7 @@ export function App() {
       {conNav && (
         <nav className="nav-inferior" aria-label="Menú principal">
           {menu(info).map(({ ruta: r, nombre, Icono }) => {
-            const activo = ruta === r || (r === "/mas" && (ruta === "/modulos" || PANTALLAS.some((p) => p.ruta === ruta)));
+            const activo = ruta === r || (r === "/mas" && (ruta === "/modulos" || ruta.startsWith("/cuenta/") || PANTALLAS.some((p) => p.ruta === ruta)));
             return (
             <a key={r} href={r} className={activo ? "activo" : ""} aria-current={activo ? "page" : undefined}
               onClick={(e) => { e.preventDefault(); navegar(r); }}>

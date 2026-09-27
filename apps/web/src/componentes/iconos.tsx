@@ -37,3 +37,7 @@ export const IUsuarios = (p: P) => <Icono {...p}><circle cx="9" cy="8" r="3.2" /
 export const IPiezas = (p: P) => <Icono {...p}><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" /><path d="M17 14v6M14 17h6" /></Icono>;
 export const IReloj = (p: P) => <Icono {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Icono>;
 export const IFactura = (p: P) => <Icono {...p}><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z" /><path d="M9 8h6M9 12h6" /></Icono>;
+export const IMesa = (p: P) => <Icono {...p}><path d="M3 9h18M5 9v11M19 9v11M8 9V5h8v4" /></Icono>;
+export const IMoto = (p: P) => <Icono {...p}><circle cx="6" cy="17" r="3" /><circle cx="18" cy="17" r="3" /><path d="M9 17h6l-2-6h-4M13 11l2-4h3M6 14l3-3" /></Icono>;
+export const IOlla = (p: P) => <Icono {...p}><path d="M4 10h16v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z" /><path d="M2 10h20M9 6c0-1 1-2 1-3M14 6c0-1 1-2 1-3" /></Icono>;
+export const IReceta = (p: P) => <Icono {...p}><path d="M6 3h12v18H6z" /><path d="M9 7h6M9 11h6M9 15h3" /></Icono>;

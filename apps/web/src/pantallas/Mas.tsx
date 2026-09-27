@@ -2,10 +2,10 @@ import type { ReactElement } from "react";
 import type { InfoNegocio } from "../tipos";
 import { puedeGestionar } from "../tipos";
 import { pantallasActivas } from "../modulos";
-import { ICamion, IDocumento, IFactura, IFiados, IPiezas, IReloj, IUsuarios } from "../componentes/iconos";
+import { ICamion, IDocumento, IFactura, IFiados, IMesa, IMoto, IOlla, IPiezas, IReceta, IReloj, IUsuarios } from "../componentes/iconos";
 
 const ICONOS: Record<string, (p: { tam?: number }) => ReactElement> = {
-  M14: IFiados, M15: ICamion, M16: IReloj, M24: IDocumento, M19: IFactura, M20: IUsuarios,
+  M09: IMesa, M10: IMoto, "M09|M10": IOlla, M08: IReceta, M14: IFiados, M15: ICamion, M16: IReloj, M24: IDocumento, M19: IFactura, M20: IUsuarios,
 };
 
 export function Mas({ info, navegar }: { info: InfoNegocio; navegar: (r: string) => void }) {

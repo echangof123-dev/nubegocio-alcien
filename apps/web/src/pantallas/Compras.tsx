@@ -180,7 +180,7 @@ function NuevaCompra({ info, alCerrar, alGuardar }: { info: InfoNegocio; alCerra
         <button className="boton bloque" disabled={ocupado || !lineas.length}>{ocupado ? "Guardando…" : `Guardar compra de ${dinero(total)}`}</button>
       </form>
       {elegir && (
-        <SelectorProducto titulo="¿Qué compraste?" alCerrar={() => setElegir(false)} alElegir={(p) => {
+        <SelectorProducto titulo="¿Qué compraste?" filtro="todos" alCerrar={() => setElegir(false)} alElegir={(p) => {
           setElegir(false);
           if (!lineas.some((l) => l.producto.id === p.id)) {
             setLineas((ls) => [...ls, { producto: p, cantidad: "", costo: p.costo !== null ? String(p.costo).replace(".", ",") : "", lote: "", vence: "" }]);

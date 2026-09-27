@@ -5,18 +5,21 @@ import { dinero, cantidad as fmtCantidad } from "../formato";
 import { Dialogo } from "./basicos";
 
 /** Buscar y elegir un producto (compras, cotizaciones, recetas…). */
-export function SelectorProducto({ alElegir, alCerrar, titulo = "Elegir producto" }: {
+export function SelectorProducto({ alElegir, alCerrar, titulo = "Elegir producto", filtro = "venta" }: {
   alElegir: (p: Producto) => void; alCerrar: () => void; titulo?: string;
+  /** venta: lo que se vende · todos: también insumos (compras) · insumo: solo insumos (recetas) */
+  filtro?: "venta" | "todos" | "insumo";
 }) {
   const [q, setQ] = useState("");
   const [productos, setProductos] = useState<Producto[]>([]);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      api<{ productos: Producto[] }>("GET", "/productos?q=" + encodeURIComponent(q)).then((r) => setProductos(r.productos)).catch(() => {});
+      const extra = filtro === "todos" ? "&todos=1" : filtro === "insumo" ? "&tipo=insumo" : "";
+      api<{ productos: Producto[] }>("GET", "/productos?q=" + encodeURIComponent(q) + extra).then((r) => setProductos(r.productos)).catch(() => {});
     }, 200);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [q, filtro]);
 
   return (
     <Dialogo titulo={titulo} alCerrar={alCerrar}>

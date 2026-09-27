@@ -260,3 +260,14 @@ p { margin: 0; }
 .tile span:last-child { font-size: 13px; color: var(--ink-muted); line-height: 1.35; }
 .tile-icono { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
   background: var(--brand-soft); color: var(--brand); margin-bottom: 6px; }
+
+/* ---------- Mesas y cocina ---------- */
+
+.rejilla-mesas { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.mesa { min-height: 104px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8px;
+  border-radius: var(--radius-md); border: 2px dashed var(--border); background: var(--surface); }
+.mesa strong { font-size: 22px; }
+.mesa.ocupada { border: 2px solid var(--brand); background: var(--brand-soft); }
+.mesa-tiempo { font-size: 12px; color: var(--ink-muted); }
+.rejilla-cocina { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; align-items: start; }
+.comanda { border-top: 6px solid var(--accent); gap: 10px; }

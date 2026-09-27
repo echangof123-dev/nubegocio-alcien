@@ -49,6 +49,8 @@ export interface Producto {
   stock_minimo: number | null;
   variantes: string | null;
   es_ejemplo: boolean;
+  tipo?: "venta" | "insumo";
+  tiene_receta?: boolean;
 }
 
 export interface LineaCarrito { producto: Producto; cantidad: number }

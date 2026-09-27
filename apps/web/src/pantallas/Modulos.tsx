@@ -47,7 +47,7 @@ export function Modulos({ info, avisar, navegar, alCambiar }: {
     <div className="tarjeta" style={{ padding: "12px 16px" }}>
       <h3>{titulo}</h3>
       {lista.map((m) => {
-        const pantalla = PANTALLAS.find((p) => p.modulo === m.modulo);
+        const pantalla = PANTALLAS.find((p) => p.modulo.split("|").includes(m.modulo));
         const encendido = m.estado !== "disponible";
         return (
           <div key={m.modulo} className="comprobante-fila">
