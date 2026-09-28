@@ -4,6 +4,8 @@ import type { InfoNegocio, Rol } from "../tipos";
 import { puedeGestionar } from "../tipos";
 import { Aviso, Cargando, Dialogo } from "../componentes/basicos";
 import { IMas } from "../componentes/iconos";
+import { HorarioEquipo, MiJornada } from "../componentes/jornada";
+import { puede } from "../tipos";
 
 interface Miembro { id: string; nombre: string | null; celular: string; rol: Rol; activo: boolean; permisos: string[] }
 
@@ -43,6 +45,8 @@ export function Equipo({ info, avisar }: { info: InfoNegocio; avisar: (t: string
   return (
     <div className="contenido" style={{ maxWidth: 640, width: "100%", margin: "0 auto" }}>
       <h1>Equipo</h1>
+      <MiJornada avisar={avisar} />
+      {puede(info, "reportes") && <HorarioEquipo />}
       {gestiona && <button className="boton bloque" onClick={() => setInvitar(true)}><IMas tam={20} /> Agregar persona</button>}
       <div className="tarjeta" style={{ padding: "4px 16px" }}>
         {equipo.map((m) => (

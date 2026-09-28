@@ -1,4 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { dinero } from "../formato";
+import { fotoComprimida } from "../componentes/foto";
 import { api, mensajeDe } from "../api";
 import type { InfoNegocio } from "../tipos";
 import { puedeGestionar } from "../tipos";
@@ -9,9 +11,23 @@ import { guardarImpresora, impresoraGuardada, type Impresora } from "../componen
 const METODOS: [string, string][] = [["efectivo", "Efectivo"], ["transferencia", "Transferencia"], ["tarjeta", "Tarjeta"], ["deuna", "DeUna"]];
 
 /** Ajustes del negocio: datos del recibo, impresora, formas de pago, IVA e inventario. */
-export function Ajustes({ info, avisar, alCambiar, alSalir, alCambiarNegocio, navegar }: {
-  info: InfoNegocio; avisar: (t: string) => void; alCambiar: () => void; alSalir: () => void; alCambiarNegocio?: () => void; navegar: (r: string) => void;
+export function Ajustes({ info, avisar, alCambiar, alSalir, alCambiarNegocio, alElegirNegocio, navegar }: {
+  info: InfoNegocio; avisar: (t: string) => void; alCambiar: () => void; alSalir: () => void; alCambiarNegocio?: () => void;
+  alElegirNegocio?: (id: string) => void; navegar: (r: string) => void;
 }) {
+  const [negocios, setNegocios] = useState<{ negocio_id: string; nombre: string; rol: string; ventas: number | null; total: number | null; mes?: number }[] | null>(null);
+  useEffect(() => {
+    if (alCambiarNegocio) api<{ negocios: NonNullable<typeof negocios> }>("GET", "/mis-negocios/resumen").then((r) => setNegocios(r.negocios)).catch(() => {});
+  }, [alCambiarNegocio]);
+  const [logo, setLogo] = useState(info.negocio.logo_version ?? null);
+  async function subirLogo(f: File | undefined) {
+    if (!f) return;
+    try {
+      const datos = await fotoComprimida(f, 320);
+      const r = await api<{ logo_version: number }>("POST", "/negocio/logo", { tipo: "image/jpeg", datos });
+      setLogo(r.logo_version); avisar("Logo guardado"); alCambiar();
+    } catch (e) { avisar(mensajeDe(e)); }
+  }
   const n = info.negocio;
   const gestiona = puedeGestionar(info.rol);
   const [d, setD] = useState({
@@ -52,6 +68,15 @@ export function Ajustes({ info, avisar, alCambiar, alSalir, alCambiarNegocio, na
       {gestiona && (
         <form className="tarjeta" onSubmit={guardar} style={{ gap: 12 }}>
           <h3>Datos del recibo</h3>
+          <div className="foto-producto">
+            {logo ? <img src={`/api/logo/${n.id}?v=${logo}`} alt="Logo del negocio" style={{ objectFit: "contain", background: "#fff" }} /> : <span className="sin-foto">Sin logo</span>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label className="boton pequeno secundario" htmlFor="aj-logo" style={{ cursor: "pointer" }}>{logo ? "Cambiar logo" : "Subir logo"}</label>
+              <input id="aj-logo" className="oculto" type="file" accept="image/*" onChange={(e) => { void subirLogo(e.target.files?.[0]); e.target.value = ""; }} />
+              {logo ? <button type="button" className="boton texto pequeno" onClick={async () => { await api("DELETE", "/negocio/logo").catch(() => {}); setLogo(null); alCambiar(); }}>Quitar logo</button> : null}
+              <span className="muted" style={{ fontSize: 12 }}>Sale en el recibo y en tu catálogo en línea.</span>
+            </div>
+          </div>
           <div className="campo"><label htmlFor="aj-dir">Dirección</label>
             <input id="aj-dir" className="entrada" maxLength={300} value={d.direccion} onChange={(e) => setD({ ...d, direccion: e.target.value })} /></div>
           <div className="campo"><label htmlFor="aj-tel">Teléfono</label>
@@ -78,6 +103,20 @@ export function Ajustes({ info, avisar, alCambiar, alSalir, alCambiarNegocio, na
         </form>
       )}
 
+      {negocios && negocios.length > 1 && (
+        <div className="tarjeta" style={{ padding: "4px 16px" }}>
+          <h3 style={{ paddingTop: 12 }}>Tus negocios y sucursales</h3>
+          {negocios.map((x) => (
+            <div key={x.negocio_id} className="movimiento">
+              <div className="textos">
+                <strong>{x.nombre}{x.negocio_id === n.id ? " (abierto)" : ""}</strong>
+                <span>{x.total !== null ? `Hoy ${dinero(x.total)} en ${x.ventas} ventas · este mes ${dinero(x.mes ?? 0)}` : "Eres parte del equipo"}</span>
+              </div>
+              {x.negocio_id !== n.id && alElegirNegocio && <button className="boton pequeno secundario" onClick={() => alElegirNegocio(x.negocio_id)}>Abrir</button>}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="tarjeta" style={{ gap: 8 }}>
         <h3>{n.nombre}</h3>
         <p className="muted" style={{ margin: 0 }}>{n.tipo} · Plan {n.plan_vigente}{n.suscripcion === "prueba" ? ` · prueba: quedan ${diasPrueba} días` : ""}</p>
@@ -85,7 +124,7 @@ export function Ajustes({ info, avisar, alCambiar, alSalir, alCambiarNegocio, na
           {gestiona && <button className="boton secundario pequeno" onClick={() => navegar("/modulos")}>Módulos</button>}
           {gestiona && <button className="boton secundario pequeno" onClick={() => navegar("/equipo")}>Equipo</button>}
           {alCambiarNegocio && <button className="boton secundario pequeno" onClick={alCambiarNegocio}>Cambiar de negocio</button>}
-          <button className="boton secundario pequeno" onClick={() => navegar("/nuevo-negocio")}>Crear otro negocio</button>
+          <button className="boton secundario pequeno" onClick={() => navegar("/nuevo-negocio")}>Crear otro negocio o sucursal</button>
         </div>
         <button className="boton peligro" onClick={alSalir}><ISalir tam={18} /> Salir</button>
       </div>

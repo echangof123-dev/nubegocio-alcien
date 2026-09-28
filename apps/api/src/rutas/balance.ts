@@ -97,7 +97,7 @@ export function rutasBalance(r: Router, dep: { pool: Pool; sri: ServicioSri }) {
 <style>
   *{box-sizing:border-box}body{margin:0;padding:16px;background:#f3f5f9;color:#0b1b33;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   .ticket{max-width:380px;margin:0 auto;background:#fff;border:1px solid #d9e0ea;border-radius:10px;padding:18px}
-  h1{font-size:17px;margin:0;text-align:center}.c{text-align:center}.suave{color:#5b6b82;font-size:12px}.sep{border-top:1px dashed #9aa6b8;margin:10px 0}
+  h1{font-size:17px;margin:0;text-align:center}.logo{max-width:120px;max-height:70px;object-fit:contain;margin-bottom:6px;filter:grayscale(1)}.c{text-align:center}.suave{color:#5b6b82;font-size:12px}.sep{border-top:1px dashed #9aa6b8;margin:10px 0}
   table{width:100%;border-collapse:collapse}td{padding:3px 0;vertical-align:top}.n{text-align:right;white-space:nowrap;padding-left:8px}
   .total td{font-size:17px;font-weight:800;padding-top:6px}.anulada{background:#fde8e8;color:#9b1c1c;font-weight:700;text-align:center;padding:6px;border-radius:6px}
   .acciones{max-width:380px;margin:12px auto 0;display:flex;gap:8px}.acciones button,.acciones a{flex:1;min-height:44px;border-radius:10px;border:2px solid #1847c2;background:#fff;color:#1847c2;font:700 15px system-ui;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;cursor:pointer}
@@ -106,6 +106,7 @@ export function rutasBalance(r: Router, dep: { pool: Pool; sri: ServicioSri }) {
   @media print{body{background:#fff;padding:0;font-size:${ancho === 58 ? 11 : 12}px}.ticket{border:0;padding:0;max-width:none;width:${ancho ? `${ancho - 4}mm` : "auto"}}.acciones{display:none}h1{font-size:14px}.total td{font-size:14px}}
 </style></head><body><main class="ticket">
 ${v.estado === "anulada" ? '<p class="anulada">VENTA ANULADA</p>' : ""}
+${v.logo_version ? `<div class="c"><img class="logo" src="/api/logo/${h(v.negocio_id)}?v=${h(v.logo_version)}" alt=""></div>` : ""}
 <h1>${h(v.negocio)}</h1>
 <div class="c suave">${v.ruc ? `RUC ${h(v.ruc)}<br>` : ""}${v.direccion ? `${h(v.direccion)}<br>` : ""}${v.telefono ? `Tel. ${h(v.telefono)}` : ""}</div>
 <div class="sep"></div>

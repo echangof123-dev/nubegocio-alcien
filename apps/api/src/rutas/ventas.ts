@@ -45,6 +45,19 @@ export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
     });
 
     const comprobante = c.comprobante === undefined ? "nota" : opcion(c.comprobante, "El comprobante", ["nota", "factura"] as const);
+    // Propina o servicio: una línea sin IVA que no mueve inventario
+    const propina = numeroOpcional(c.propina, "La propina", { min: 0, max: 10_000, decimales: 2 });
+    if (propina) {
+      const { rows: pp } = await db.query<{ id: string }>("select app.producto_propina() as id");
+      items.push({ producto_id: pp[0]!.id, cantidad: 1, precio: propina });
+    }
+    // Venta hecha sin internet: la misma clave no se registra dos veces
+    const clave = uuidOpcional(c.clave, "La clave de la venta");
+    if (clave) {
+      const { rows: ya } = await db.query<{ venta_id: string; numero: number; total: number; token: string }>(
+        "select id as venta_id, numero, total, 0 as vuelto, token_publico as token from app.venta where clave_cliente = $1", [clave]);
+      if (ya[0]) return { status: 200, cuerpo: { venta: ya[0], factura: null, repetida: true } };
+    }
     const listaPrecios = uuidOpcional(c.lista_id, "La lista de precios");
     const { rows } = listaPrecios
       ? await db.query<{ venta_id: string }>(
@@ -63,6 +76,7 @@ export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
       alConfirmar(() => dep.sri.enviar(firmados));
       factura = f[0];
     }
+    if (clave) await db.query("update app.venta set clave_cliente = $2 where id = $1", [rows[0]!.venta_id, clave]);
     const { rows: t } = await db.query<{ token_publico: string }>("select token_publico from app.venta where id = $1", [rows[0]!.venta_id]);
     return { status: 201, cuerpo: { venta: { ...rows[0], token: t[0]!.token_publico }, factura } };
   });
@@ -258,7 +272,7 @@ export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
     const { rows } = await db.query("select * from app.cliente_saldo where cliente_id = $1", [id]);
     if (!rows[0]) throw noEncontrado("Cliente no encontrado");
     const { rows: movimientos } = await db.query(
-      `select f.tipo, f.monto, f.metodo, f.creado_en, v.numero as venta_numero
+      `select f.tipo, f.monto, f.metodo, f.creado_en, f.concepto, v.numero as venta_numero
        from app.fiado_movimiento f left join app.venta v on v.id = f.venta_id
        where f.cliente_id = $1 order by f.creado_en desc limit 100`, [id]);
     return { cliente: rows[0], movimientos };

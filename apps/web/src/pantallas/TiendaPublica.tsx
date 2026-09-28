@@ -7,7 +7,7 @@ import { IMas, IMenos } from "../componentes/iconos";
 interface Variante { id: string; variante: string; precio: number; agotado: boolean }
 interface ProductoPub { id: string; foto_version?: number | null; nombre: string; precio: number; unidad: string; categoria_id: string | null; agotado: boolean; variantes: Variante[] | null }
 interface Catalogo {
-  negocio: string; tipo: string; mensaje: string | null; whatsapp: string | null; acepta_pedidos: boolean; costo_envio: number | null;
+  negocio: string; negocio_id?: string; logo_version?: number | null; tipo: string; mensaje: string | null; whatsapp: string | null; acepta_pedidos: boolean; costo_envio: number | null;
   categorias: { id: string; nombre: string }[]; productos: ProductoPub[];
 }
 interface Linea { id: string; nombre: string; precio: number; cantidad: number }
@@ -59,6 +59,7 @@ export function TiendaPublica({ slug }: { slug: string }) {
   return (
     <div className="tienda">
       <header className="tienda-cabecera">
+        {cat.logo_version ? <img className="tienda-logo" src={`/api/logo/${cat.negocio_id}?v=${cat.logo_version}`} alt="" /> : null}
         <h1>{cat.negocio}</h1>
         <span className="muted">{cat.mensaje ?? cat.tipo}</span>
       </header>

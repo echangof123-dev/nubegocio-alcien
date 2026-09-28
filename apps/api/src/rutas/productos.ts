@@ -6,7 +6,7 @@ import { booleano, numero, numeroOpcional, objeto, texto, textoOpcional, uuid, u
 const COLUMNAS = `p.id, p.nombre, p.categoria_id, c.nombre as categoria, p.unidad, p.precio, p.costo, p.iva,
   p.codigo_barras, p.maneja_stock, p.stock, p.stock_minimo, p.variantes, p.es_ejemplo, p.activo, p.tipo,
   exists (select 1 from app.receta r where r.producto_id = p.id) as tiene_receta,
-  p.padre_id, p.variante, p.garantia_meses, p.duracion_min, p.comision_pct, p.foto_version,
+  p.padre_id, p.variante, p.garantia_meses, p.duracion_min, p.comision_pct, p.foto_version, p.es_combo,
   (select count(*)::int from app.producto h where h.padre_id = p.id and h.activo) as hijos,
   (select coalesce(sum(h.stock), 0) from app.producto h where h.padre_id = p.id and h.activo) as stock_variantes`;
 

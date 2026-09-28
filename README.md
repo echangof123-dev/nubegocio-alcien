@@ -12,7 +12,7 @@ Al registrarse, el usuario dice qué negocio tiene y el sistema se arma solo: ac
 | 1 · Alta automática | Acceso por WhatsApp, catálogo, búsqueda, motor de plantillas, tipos nuevos por IA, pantallas de registro | Listo y probado |
 | 2 · Vender | Productos, precios, venta por peso, código de barras, cobro con vuelto, pago mixto, fiado, caja, gastos, anulaciones | Listo y probado |
 | 3 · Control | Proveedores y compras, reportes por periodo con descarga para Excel, recordatorios de fiado por WhatsApp | Listo y probado (falta el envío automático de recordatorios de fiado) |
-| Como Treinta | Balance de ingresos y egresos, gastos por categoría con fecha, venta libre, recibo de cada venta por WhatsApp o impresora térmica (58/80 mm), clientes con historial y fecha de pago, inventario con valor y alertas, carga de productos desde Excel, fotos de productos, descargas para Excel, ajustes del negocio, permisos por empleado, asistente que responde preguntas y anota ventas o gastos escribiendo | Listo y probado |
+| Como Treinta | Balance de ingresos y egresos, gastos por categoría con fecha, venta libre, recibo de cada venta por WhatsApp o impresora térmica (58/80 mm), clientes con historial y fecha de pago, inventario con valor y alertas, carga de productos desde Excel, fotos de productos, descargas para Excel, ajustes del negocio, permisos por empleado, asistente que responde preguntas y anota ventas o gastos escribiendo, deudas por cobrar y por pagar, logo, combos, propina, varias sucursales, jornada de empleados y ventas sin internet | Listo y probado |
 | Módulos por negocio | Los 26 módulos de la matriz: mesas y cocina, recetas, pedidos y delivery, variantes, listas de precios, series y garantías, catálogo en línea, cotizaciones, lotes, agenda y comisiones, órdenes de trabajo, reservas, membresías, acopio con humedad y anticipos | Listo y probado (5 recorridos en navegador) |
 | 4 · SRI | Factura y nota de crédito electrónicas, firma XAdES-BES, envío y autorización con reintentos, RIDE para compartir | Listo y probado (con un SRI simulado; falta la prueba en el ambiente de pruebas real del SRI) |
 | 5 · Negocio | Planes y cobro recurrente con Kushki, panel de administración | Pendiente (el equipo y los roles ya funcionan) |
@@ -60,6 +60,7 @@ Sin dependencias de ejecución: usa `node:http`, `node:crypto` y un cliente prop
 | `/api/listas`, `/api/series`, `/api/catalogo/*`, `GET /api/tienda/:slug` | Tiendas (`rutas/retail.ts`) |
 | `/api/profesionales`, `/api/comisiones`, `/api/citas`, `/api/ordenes`, `/api/recursos`, `/api/reservas`, `/api/planes-membresia`, `/api/membresias`, `/api/asistencias`, `GET /api/o/:token` | Servicios (`rutas/servicios.ts`) |
 | `GET /api/balance`, `/api/gastos`, `POST /api/ventas/libre`, `GET /api/r/:token`, `/api/clientes/:id/compras`, `/api/inventario`, `/api/productos/importar`, `/api/productos/:id/foto`, `GET /api/f/:producto`, `/api/reportes/{gastos,inventario}.csv` | Paridad con Treinta (`rutas/balance.ts`) |
+| `/api/deudas`, `/api/clientes/:id/deudas`, `/api/deudas-proveedor`, `/api/negocio/logo`, `GET /api/logo/:negocio`, `/api/productos/:id/combo`, `/api/mis-negocios/resumen`, `/api/jornada(s)` | Deudas, logo, combos, sucursales y jornada (`rutas/deudas.ts`) |
 | `POST /api/asistente` | Asistente del negocio (`asistente.ts`: entiende frases en español sin IA de pago; ventas y gastos se confirman) |
 | `/api/productores`, `/api/anticipos`, `/api/acopio`, `GET /api/reportes`, `GET /api/reportes/ventas.csv` | Acopio y reportes por periodo (`rutas/acopio.ts`) |
 
@@ -99,11 +100,11 @@ En desarrollo el código de acceso aparece en pantalla ("Modo de prueba"); en pr
 ## Pruebas
 
 ```bash
-bash db/scripts/test.sh            # 15 archivos de pruebas SQL
-bash apps/api/scripts/test.sh      # 51 pruebas de la API contra PostgreSQL real (con Python + lxml + cryptography verifica la firma)
+bash db/scripts/test.sh            # 16 archivos de pruebas SQL
+bash apps/api/scripts/test.sh      # 55 pruebas de la API contra PostgreSQL real (con Python + lxml + cryptography verifica la firma)
 node e2e/sri-falso.mjs &           # SRI de mentira para el recorrido (API con SRI_URL_PRUEBAS=http://127.0.0.1:9099/ws)
 BASE=http://localhost:8080 node e2e/flujo-venta.mjs   # recorrido completo en navegador, incluida una factura
-# y los recorridos por tipo de negocio: flujo-restaurante, flujo-ropa, flujo-servicios, flujo-acopio, flujo-treinta
+# y los recorridos por tipo de negocio: flujo-restaurante, flujo-ropa, flujo-servicios, flujo-acopio, flujo-treinta, flujo-sin-internet
 ```
 
 La CI de GitHub corre las tres en cada cambio y guarda las capturas del recorrido.

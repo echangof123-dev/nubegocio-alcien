@@ -5,7 +5,7 @@ import { pantallasActivas } from "../modulos";
 import { ICamion, IDocumento, IFactura, IFiados, IMesa, IMoto, IOlla, IPiezas, IReceta, IReloj, IUsuarios, IEtiqueta, IEscudo, IGlobo, ICalendario, ILlave, ICama, ICarnet, IBalanza, IGrafico, ICaja, IProductos, IReportes, IChat } from "../componentes/iconos";
 
 const ICONOS: Record<string, (p: { tam?: number }) => ReactElement> = {
-  "/asistente": IChat, "/clientes": IUsuarios, "/gastos": ICaja, "/inventario": IProductos, "/reportes": IReportes, "/ajustes": IPiezas,
+  "/asistente": IChat, "/deudas": IFiados, "/clientes": IUsuarios, "/gastos": ICaja, "/inventario": IProductos, "/reportes": IReportes, "/ajustes": IPiezas,
   M25: IBalanza, M21: IGrafico, M11: ICalendario, M13: ILlave, M26: ICama, M22: ICarnet, "M11|M12|M13": IUsuarios, M17: IEtiqueta, M23: IEscudo, M18: IGlobo, M09: IMesa, M10: IMoto, "M09|M10": IOlla, M08: IReceta, M14: IFiados, M15: ICamion, M16: IReloj, M24: IDocumento, M19: IFactura, M20: IUsuarios,
 };
 

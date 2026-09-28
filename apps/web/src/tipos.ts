@@ -32,6 +32,7 @@ export interface Negocio {
   direccion?: string | null;
   telefono?: string | null;
   mensaje_recibo?: string | null;
+  logo_version?: number | null;
 }
 
 export interface InfoNegocio { negocio: Negocio; rol: Rol; modulos: Modulo[]; permisos?: string[] }
@@ -60,6 +61,7 @@ export interface Producto {
   duracion_min?: number | null;
   comision_pct?: number | null;
   foto_version?: number | null;
+  es_combo?: boolean;
   hijos?: number;
   stock_variantes?: number;
 }

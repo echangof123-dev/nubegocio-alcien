@@ -16,6 +16,7 @@ interface Reporte {
   categorias: { categoria: string; total: number }[];
   vendedores: { vendedor: string; ventas: number; total: number }[];
   gastos_categorias: { categoria: string; total: number }[];
+  sin_ventas?: { nombre: string; stock: number; valor: number | null; ultima_venta: string | null }[];
 }
 type Periodo = "hoy" | "7" | "mes" | "anterior" | "30";
 const METODOS: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta", deuna: "DeUna", fiado: "Fiado" };
@@ -90,6 +91,18 @@ export function Estadisticas({ info, avisar }: { info: InfoNegocio; avisar: (t: 
             <Ranking titulo="Cómo te pagan" filas={rep.por_metodo.map((m) => ({ nombre: METODOS[m.metodo] ?? m.metodo, valor: n(m.total) }))} />
             {rep.categorias.length > 1 && <Ranking titulo="Por categoría" filas={rep.categorias.map((c) => ({ nombre: c.categoria, valor: n(c.total) }))} />}
             {rep.vendedores.length > 0 && <Ranking titulo="Por vendedor" filas={rep.vendedores.map((v) => ({ nombre: v.vendedor, valor: n(v.total), nota: `${v.ventas} ${Number(v.ventas) === 1 ? "venta" : "ventas"}` }))} />}
+            {(rep.sin_ventas ?? []).length > 0 && (
+              <div className="tarjeta" style={{ gap: 8 }}>
+                <h3>Lo que no se vendió</h3>
+                <span className="muted" style={{ fontSize: 13 }}>Tienen stock pero ninguna venta en este periodo.</span>
+                {rep.sin_ventas!.map((x) => (
+                  <div key={x.nombre} className="fila" style={{ fontSize: 14 }}>
+                    <span>{x.nombre} <span className="muted">· {fmtCantidad(Number(x.stock))} en stock{x.ultima_venta ? ` · última venta ${new Date(x.ultima_venta).toLocaleDateString("es-EC")}` : " · nunca vendido"}</span></span>
+                    {x.valor != null && <strong>{dinero(Number(x.valor))}</strong>}
+                  </div>
+                ))}
+              </div>
+            )}
             {rep.gastos_categorias.length > 0 && <Ranking titulo="Gastos" filas={rep.gastos_categorias.map((g) => ({ nombre: g.categoria, valor: n(g.total) }))} />}
           </div>
 

@@ -110,7 +110,7 @@ export function Cuenta({ id, info, navegar, avisar }: { id: string; info: InfoNe
       {elegir && <SelectorProducto titulo="¿Qué piden?" alCerrar={() => setElegir(false)} alElegir={(p) => { setElegir(false); setAgregar(p); }} />}
       {agregar && <AgregarItem cuentaId={id} producto={agregar} alCerrar={() => setAgregar(null)} alGuardar={() => { setAgregar(null); cargar(); }} />}
       {cobrar && (
-        <DialogoCobro info={info} titulo={`Cobrar ${titulo}`} total={totalSeleccion} alCerrar={() => setCobrar(false)}
+        <DialogoCobro info={info} titulo={`Cobrar ${titulo}`} total={totalSeleccion} conPropina alCerrar={() => setCobrar(false)}
           cobrar={async (d) => {
             const r = await api<{ venta: { numero: number; cuenta_cerrada: boolean } }>("POST", `/cuentas/${id}/cobrar`, { ...d, items: seleccion ?? undefined });
             setCobrar(false);

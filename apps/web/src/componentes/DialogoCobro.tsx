@@ -12,16 +12,23 @@ export interface DatosCobro {
   pagos: Record<string, unknown>[];
   comprobante: "nota" | "factura";
   cliente_id?: string;
+  propina?: number;
 }
 
 /**
  * Cobro de algo ya armado (una cuenta de mesa, un pedido, una cita…): forma de pago, vuelto y
  * factura opcional. `cobrar` hace la llamada a la API y devuelve el número de venta.
  */
-export function DialogoCobro({ info, titulo, total, cliente: clienteInicial = null, alCerrar, cobrar, conFiado = true }: {
+export function DialogoCobro({ info, titulo, total: subtotal, cliente: clienteInicial = null, alCerrar, cobrar, conFiado = true, conPropina = false }: {
   info: InfoNegocio; titulo: string; total: number; cliente?: Cliente | null;
   alCerrar: () => void; cobrar: (d: DatosCobro) => Promise<void>; conFiado?: boolean;
+  /** Restaurantes: propina o 10 % de servicio, sin IVA. */
+  conPropina?: boolean;
 }) {
+  const [propinaPct, setPropinaPct] = useState<number | "otra">(0);
+  const [propinaOtra, setPropinaOtra] = useState("");
+  const propina = propinaPct === "otra" ? redondear(parsearNumero(propinaOtra) ?? 0) : redondear(subtotal * propinaPct / 100);
+  const total = redondear(subtotal + propina);
   const metodos = [...info.negocio.metodos_pago, ...(conFiado && tieneModulo(info, "M14") ? ["fiado"] : [])];
   const [metodo, setMetodo] = useState(metodos[0] ?? "efectivo");
   const [recibido, setRecibido] = useState("");
@@ -50,7 +57,7 @@ export function DialogoCobro({ info, titulo, total, cliente: clienteInicial = nu
     if (metodo === "efectivo") pago.recibido = recibidoN ?? total;
     setOcupado(true);
     try {
-      await cobrar({ pagos: [pago], comprobante: factura ? "factura" : "nota", cliente_id: cliente?.id });
+      await cobrar({ pagos: [pago], comprobante: factura ? "factura" : "nota", cliente_id: cliente?.id, ...(propina > 0 ? { propina } : {}) });
     } catch (err) {
       setError(mensajeDe(err));
       setOcupado(false);
@@ -61,6 +68,18 @@ export function DialogoCobro({ info, titulo, total, cliente: clienteInicial = nu
     <Dialogo titulo={titulo} alCerrar={alCerrar}>
       <form onSubmit={enviar} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <p className="monto-grande">{dinero(total)}</p>
+        {conPropina && (
+          <>
+            <div className="chips" role="group" aria-label="Propina">
+              {([0, 5, 10, "otra"] as const).map((x) => (
+                <button type="button" key={String(x)} className={`chip${propinaPct === x ? " activo" : ""}`} aria-pressed={propinaPct === x}
+                  onClick={() => setPropinaPct(x)}>{x === 0 ? "Sin propina" : x === "otra" ? "Otra" : `${x} %`}</button>
+              ))}
+            </div>
+            {propinaPct === "otra" && <CampoMonto id="dc-propina" etiqueta="Propina" valor={propinaOtra} alCambiar={setPropinaOtra} />}
+            {propina > 0 && <span className="muted" style={{ fontSize: 13 }}>Consumo {dinero(subtotal)} + propina {dinero(propina)}</span>}
+          </>
+        )}
         <div className="opciones" role="group" aria-label="Forma de pago">
           {metodos.map((m) => (
             <button type="button" key={m} className={`opcion${metodo === m ? " activa" : ""}`} aria-pressed={metodo === m}

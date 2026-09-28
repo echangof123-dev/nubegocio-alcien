@@ -9,7 +9,6 @@ import { Vender } from "./pantallas/Vender";
 import { Cobrar } from "./pantallas/Cobrar";
 import { Caja } from "./pantallas/Caja";
 import { Productos } from "./pantallas/Productos";
-import { Fiados } from "./pantallas/Fiados";
 import { Reportes } from "./pantallas/Reportes";
 import { Facturacion } from "./pantallas/Facturacion";
 import { Mas } from "./pantallas/Mas";
@@ -38,6 +37,8 @@ import { Clientes } from "./pantallas/Clientes";
 import { Inventario } from "./pantallas/Inventario";
 import { Ajustes } from "./pantallas/Ajustes";
 import { Asistente } from "./pantallas/Asistente";
+import { Deudas } from "./pantallas/Deudas";
+import { AvisoRed } from "./componentes/red";
 import { PANTALLAS, titulo } from "./modulos";
 
 function useRuta(): [string, (r: string) => void] {
@@ -162,7 +163,8 @@ export function App() {
     case "/cobrar": pantalla = <Cobrar info={info} carrito={carrito} setCarrito={setCarrito} navegar={navegar} />; break;
     case "/caja": pantalla = <Caja info={info} avisar={avisar} />; break;
     case "/productos": pantalla = <Productos info={info} avisar={avisar} />; break;
-    case "/fiados": pantalla = <Fiados avisar={avisar} negocio={info.negocio.nombre} />; break;
+    case "/fiados":
+    case "/deudas": pantalla = <Deudas info={info} avisar={avisar} />; break;
     case "/facturacion": pantalla = <Facturacion info={info} avisar={avisar} navegar={navegar} />; break;
     case "/mas": pantalla = <Mas info={info} navegar={navegar} />; break;
     case "/modulos": pantalla = <Modulos info={info} avisar={avisar} navegar={navegar} alCambiar={recargarInfo} />; break;
@@ -190,7 +192,8 @@ export function App() {
     case "/clientes": pantalla = <Clientes info={info} avisar={avisar} />; break;
     case "/inventario": pantalla = <Inventario info={info} avisar={avisar} />; break;
     case "/ajustes":
-      pantalla = <Ajustes info={info} avisar={avisar} alCambiar={recargarInfo} alSalir={salir} navegar={navegar} alCambiarNegocio={cambiarNegocio} />;
+      pantalla = <Ajustes info={info} avisar={avisar} alCambiar={recargarInfo} alSalir={salir} navegar={navegar} alCambiarNegocio={cambiarNegocio}
+        alElegirNegocio={(idNegocio) => { setCarritoEstado([]); elegir(sesion.negocios, idNegocio); navegar("/"); }} />;
       break;
     case "/reportes":
       pantalla = <Reportes info={info} avisar={avisar} alSalir={salir} navegar={navegar}
@@ -212,6 +215,7 @@ export function App() {
           </div>
         </header>
       )}
+      <AvisoRed avisar={avisar} />
       {pantalla}
       {conNav && (
         <nav className="nav-inferior" aria-label="Menú principal">

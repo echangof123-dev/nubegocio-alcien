@@ -1,6 +1,6 @@
 import { AccionesRecibo } from "../componentes/recibo";
 import { useEffect, useState, type FormEvent } from "react";
-import { api, mensajeDe } from "../api";
+import { api, ErrorApi, guardarVentaPendiente, mensajeDe } from "../api";
 import type { Cliente, EstadoSri as TEstadoSri, InfoNegocio, LineaCarrito } from "../tipos";
 import { tieneModulo } from "../tipos";
 import { cantidad as fmtCantidad, dinero, parsearNumero, redondear } from "../formato";
@@ -25,6 +25,7 @@ interface Hecha {
   venta_id: string; numero: number; total: number; vuelto: number; token: string; metodo: string; cliente?: Cliente | null;
   factura?: { id: string; numero: string } | null;
   conGarantia: LineaCarrito[];
+  sinRed?: boolean;
 }
 interface ListaPrecio { id: string; nombre: string; activa: boolean }
 
@@ -90,13 +91,26 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
       const pago: Record<string, unknown> = { metodo, monto: total };
       if (metodo === "efectivo") pago.recibido = recibidoN ?? total;
       if (referencia.trim() && metodo !== "efectivo" && metodo !== "fiado") pago.referencia = referencia.trim();
-      const r = await api<{ venta: { venta_id: string; numero: number; total: number; vuelto: number; token: string }; factura: { id: string; numero: string } | null }>("POST", "/ventas", {
+      const cuerpo = {
+        clave: crypto.randomUUID(),
         items: carrito.map((l) => ({ producto_id: l.producto.id, cantidad: l.cantidad })),
         pagos: [pago],
         cliente_id: cliente?.id,
         comprobante,
         lista_id: lista ?? undefined,
-      });
+      };
+      let r: { venta: { venta_id: string; numero: number; total: number; vuelto: number; token: string }; factura: { id: string; numero: string } | null };
+      try {
+        r = await api<typeof r>("POST", "/ventas", cuerpo);
+      } catch (err) {
+        // Sin señal: la venta se guarda en el teléfono y se envía sola cuando vuelva el internet
+        if (!(err instanceof ErrorApi) || err.status !== 0 || comprobante === "factura") throw err;
+        guardarVentaPendiente(cuerpo, total);
+        setHecha({ venta_id: "", numero: 0, total, vuelto: metodo === "efectivo" && recibidoN !== null ? redondear(recibidoN - total) : 0,
+          token: "", metodo, cliente, factura: null, conGarantia: [], sinRed: true });
+        setCarrito(() => []);
+        return;
+      }
       setHecha({ ...r.venta, metodo, cliente, factura: r.factura,
         conGarantia: tieneModulo(info, "M23") ? carrito.filter((l) => (l.producto.garantia_meses ?? 0) > 0) : [] });
       setCarrito(() => []);
@@ -112,14 +126,15 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
       <main className="pagina-simple" style={{ justifyContent: "center", textAlign: "center", alignItems: "center" }}>
         <span style={{ color: "var(--success)" }}><ICheckCirculo tam={64} /></span>
         <h1>¡Venta registrada!</h1>
-        <p className="muted">Venta N.º {hecha.numero} · {NOMBRES[hecha.metodo]}{hecha.cliente ? ` · ${hecha.cliente.nombre}` : ""}</p>
+        <p className="muted">{hecha.sinRed ? "Guardada sin internet" : `Venta N.º ${hecha.numero}`} · {NOMBRES[hecha.metodo]}{hecha.cliente ? ` · ${hecha.cliente.nombre}` : ""}</p>
+        {hecha.sinRed && <Aviso tipo="atencion" titulo="Sin internet">La venta quedó guardada en este teléfono y se enviará sola cuando vuelva la señal.</Aviso>}
         <p className="monto-grande">{dinero(hecha.total)}</p>
         {hecha.metodo === "efectivo" && hecha.vuelto > 0 && (
           <div className="vuelto" style={{ width: "100%" }}><span>Vuelto</span><strong>{dinero(hecha.vuelto)}</strong></div>
         )}
         {hecha.metodo === "fiado" && <Aviso tipo="info">Quedó anotado en los fiados de {hecha.cliente?.nombre}.</Aviso>}
         {hecha.factura && <FacturaHecha id={hecha.factura.id} negocio={info.negocio.nombre} celular={hecha.cliente?.celular} />}
-        <AccionesRecibo token={hecha.token} negocio={info.negocio.nombre} total={Number(hecha.total)} celular={hecha.cliente?.celular} />
+        {!hecha.sinRed && <AccionesRecibo token={hecha.token} negocio={info.negocio.nombre} total={Number(hecha.total)} celular={hecha.cliente?.celular} />}
         {hecha.conGarantia.length > 0 && (
           <button className="boton secundario bloque" onClick={() => setSeries(true)}>Anotar series (garantía)</button>
         )}

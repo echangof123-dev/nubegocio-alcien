@@ -336,3 +336,10 @@ p { margin: 0; }
 .chat-entrada { position: fixed; left: 0; right: 0; bottom: calc(64px + env(safe-area-inset-bottom)); display: flex; gap: 8px; padding: 10px 16px;
   background: var(--surface); border-top: 1px solid var(--border); max-width: 720px; margin: 0 auto; }
 .chat-entrada .entrada { flex: 1; }
+.tarjeta.seleccionada { outline: 2px solid var(--brand); }
+.tienda-logo { width: 64px; height: 64px; object-fit: contain; border-radius: 12px; background: #fff; }
+
+/* Sin internet */
+.aviso-red { display: block; width: 100%; border: 0; padding: 8px 16px; font-weight: 700; font-size: 14px; text-align: center; background: var(--accent-soft); color: var(--ink); cursor: pointer; }
+.aviso-red.sin-red { background: #0b1b33; color: #fff; }
+.rejilla-2.balance-resumen { grid-template-columns: 1fr 1fr; }

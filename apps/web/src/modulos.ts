@@ -12,6 +12,7 @@ export interface PantallaModulo {
 export const PANTALLAS: PantallaModulo[] = [
   // "*": pantallas de todos los negocios (como en Treinta)
   { modulo: "*", ruta: "/asistente", nombre: "Asistente", descripcion: "Pregunta cómo va tu negocio o anota ventas escribiendo" },
+  { modulo: "*", ruta: "/deudas", nombre: "Deudas", descripcion: "Lo que te deben y lo que debes" },
   { modulo: "*", ruta: "/clientes", nombre: "Clientes", descripcion: "Historial, notas y quién te debe" },
   { modulo: "*", ruta: "/gastos", nombre: "Gastos", descripcion: "Arriendo, servicios, nómina y más" },
   { modulo: "M04", ruta: "/inventario", nombre: "Inventario", descripcion: "Valor, stock bajo y carga desde Excel" },
@@ -30,7 +31,6 @@ export const PANTALLAS: PantallaModulo[] = [
   { modulo: "M17", ruta: "/listas", nombre: "Listas de precios", descripcion: "Mayorista, distribuidor y por volumen" },
   { modulo: "M23", ruta: "/series", nombre: "Series", descripcion: "Series, IMEI y garantías" },
   { modulo: "M18", ruta: "/catalogo", nombre: "Catálogo en línea", descripcion: "Tu tienda para compartir por WhatsApp" },
-  { modulo: "M14", ruta: "/fiados", nombre: "Fiados", descripcion: "Quién te debe y sus abonos" },
   { modulo: "M15", ruta: "/compras", nombre: "Compras", descripcion: "Proveedores, compras y lo que debes" },
   { modulo: "M16", ruta: "/lotes", nombre: "Por vencer", descripcion: "Lotes vencidos o por vencer" },
   { modulo: "M24", ruta: "/cotizaciones", nombre: "Cotizaciones", descripcion: "Proformas que se vuelven venta" },

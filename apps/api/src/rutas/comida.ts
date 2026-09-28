@@ -146,9 +146,10 @@ export function rutasComida(r: Router, dep: { sri: ServicioSri }) {
     const items = c.items === undefined || c.items === null ? null : lista(c.items, "Los productos a cobrar", { min: 1 }).map(idItem);
     const comprobante = leerComprobante(c.comprobante);
     const { rows } = await ctx.db.query<{ venta_id: string }>(
-      "select * from app.cobrar_cuenta($1, $2::bigint[], $3::jsonb, $4, $5)",
+      "select * from app.cobrar_cuenta($1, $2::bigint[], $3::jsonb, $4, $5, $6)",
       [uuid(p.params.id, "La cuenta"), items ? `{${items.join(",")}}` : null, leerPagos(c.pagos),
-       uuidOpcional(c.cliente_id, "El cliente"), comprobante]);
+       uuidOpcional(c.cliente_id, "El cliente"), comprobante,
+       numeroOpcional(c.propina, "La propina", { min: 0, max: 10_000, decimales: 2 }) ?? 0]);
     const factura = await facturarSiToca(ctx, dep.sri, rows[0]!.venta_id, comprobante);
     return { status: 201, cuerpo: { venta: rows[0], factura } };
   });

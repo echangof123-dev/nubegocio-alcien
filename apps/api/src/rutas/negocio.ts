@@ -70,7 +70,7 @@ export function rutasNegocio(r: Router, dep: { pool: Pool; ia: GeneradorPlantill
       `select n.id, n.nombre, n.familia, f.nombre as familia_nombre, t.nombre as tipo, n.ruc, n.razon_social, n.regimen,
               s.plan, s.estado as suscripcion, s.vence_en, app.plan_vigente(n.id) as plan_vigente,
               c.palabra_items, c.unidad_defecto, c.iva_defecto, c.metodos_pago, c.permite_vender_sin_stock, c.exige_caja_abierta,
-              c.direccion, c.telefono, c.mensaje_recibo
+              c.direccion, c.telefono, c.mensaje_recibo, c.logo_version
        from app.negocio n
        join catalogo.familia f on f.codigo = n.familia
        join catalogo.tipo_negocio t on t.id = n.tipo_negocio_id

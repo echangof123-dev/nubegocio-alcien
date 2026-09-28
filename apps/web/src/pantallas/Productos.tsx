@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { FotoProducto } from "../componentes/foto";
+import { EditarCombo } from "../componentes/combo";
 import { HistorialProducto } from "./Inventario";
 import { api, mensajeDe } from "../api";
 import type { Categoria, InfoNegocio, Producto } from "../tipos";
@@ -82,6 +83,7 @@ function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, al
   const [garantia, setGarantia] = useState(producto?.garantia_meses ? String(producto.garantia_meses) : "");
   const [foto, setFoto] = useState(producto?.foto_version ?? null);
   const [historial, setHistorial] = useState(false);
+  const [combo, setCombo] = useState(false);
   const cambioFoto = useRef(false);
   const [variantes, setVariantes] = useState(false);
   const esModelo = (producto?.hijos ?? 0) > 0;
@@ -127,6 +129,7 @@ function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, al
   return (
     <Dialogo titulo={producto ? "Editar producto" : "Nuevo producto"} alCerrar={() => (cambioFoto.current ? alGuardar() : alCerrar())}>
       {historial && producto && <HistorialProducto producto={producto} alCerrar={() => setHistorial(false)} />}
+      {combo && producto && <EditarCombo producto={producto} alCerrar={() => setCombo(false)} alGuardar={(t) => { setCombo(false); alGuardar(); void t; }} />}
       <form onSubmit={guardar} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div className="campo">
           <label htmlFor="p-nombre">Nombre</label>
@@ -161,6 +164,11 @@ function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, al
           </div>
         </div>
         {producto && rol !== "cajero" && <FotoProducto id={producto.id} version={foto} alCambiar={(v) => { setFoto(v); cambioFoto.current = true; }} />}
+        {producto && !esModelo && !producto.padre_id && producto.tipo !== "insumo" && (!producto.tiene_receta || producto.es_combo) && rol !== "cajero" && (
+          <button type="button" className="boton texto pequeno" style={{ alignSelf: "flex-start" }} onClick={() => setCombo(true)}>
+            {producto.es_combo ? "Editar lo que lleva el combo" : "Es un combo (armado con otros productos)"}
+          </button>
+        )}
         {producto && producto.maneja_stock && !esModelo && (
           <button type="button" className="boton texto pequeno" style={{ alignSelf: "flex-start" }} onClick={() => setHistorial(true)}>Ver entradas y salidas</button>
         )}
