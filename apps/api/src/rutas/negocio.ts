@@ -5,6 +5,7 @@ import type { GeneradorPlantillas } from "../ia/plantillas.js";
 import { prohibido } from "../http/errores.js";
 import { booleano, celular, lista, numero, objeto, opcion, texto, textoOpcional, uuid } from "../http/validar.js";
 
+const PERMISOS = ["precios", "anular", "productos", "compras", "reportes", "gastos"] as const;
 const METODOS = ["efectivo", "transferencia", "tarjeta", "deuna"] as const;
 
 export function rutasNegocio(r: Router, dep: { pool: Pool; ia: GeneradorPlantillas; log: (m: string, e?: unknown) => void }) {
@@ -64,7 +65,7 @@ export function rutasNegocio(r: Router, dep: { pool: Pool; ia: GeneradorPlantill
     return { status: 201, cuerpo: { id } };
   });
 
-  r.negocio("GET", "/negocio", async (_p, { db, rol }) => {
+  r.negocio("GET", "/negocio", async (_p, { db, rol, permisos }) => {
     const { rows: n } = await db.query(
       `select n.id, n.nombre, n.familia, f.nombre as familia_nombre, t.nombre as tipo, n.ruc, n.razon_social, n.regimen,
               s.plan, s.estado as suscripcion, s.vence_en, app.plan_vigente(n.id) as plan_vigente,
@@ -76,7 +77,7 @@ export function rutasNegocio(r: Router, dep: { pool: Pool; ia: GeneradorPlantill
        join app.suscripcion s on s.negocio_id = n.id
        join app.negocio_config c on c.negocio_id = n.id`);
     const { rows: modulos } = await db.query("select * from app.modulos_visibles()");
-    return { negocio: n[0], rol, modulos };
+    return { negocio: n[0], rol, permisos, modulos };
   });
 
   r.negocio("POST", "/negocio/modulos/:codigo", async (p, { db }) => {
@@ -90,7 +91,7 @@ export function rutasNegocio(r: Router, dep: { pool: Pool; ia: GeneradorPlantill
 
   r.negocio("GET", "/negocio/equipo", async (_p, { db }) => {
     const { rows } = await db.query(
-      `select u.id, u.nombre, u.celular, m.rol, m.activo, m.creado_en
+      `select u.id, u.nombre, u.celular, m.rol, m.activo, m.permisos, m.creado_en
        from app.membresia m join auth.usuario u on u.id = m.usuario_id
        order by m.activo desc, m.creado_en`);
     return { equipo: rows };
@@ -122,16 +123,18 @@ export function rutasNegocio(r: Router, dep: { pool: Pool; ia: GeneradorPlantill
     const c = objeto(p.cuerpo);
     const activo = c.activo === undefined ? null : booleano(c.activo, "activo");
     const nuevoRol = c.rol === undefined ? null : opcion(c.rol, "El rol", ["administrador", "cajero", "bodeguero"] as const);
+    const permisos = c.permisos === undefined ? null
+      : [...new Set(lista(c.permisos, "Los permisos", { max: 6 }).map((x) => opcion(x, "El permiso", PERMISOS)))];
     if (nuevoRol === "administrador" && rol !== "dueno") throw prohibido("Solo el dueño nombra administradores");
     const res = await db.query(
-      `update app.membresia set activo = coalesce($2, activo), rol = coalesce($4, rol)
+      `update app.membresia set activo = coalesce($2, activo), rol = coalesce($4, rol), permisos = coalesce($5::text[], permisos)
        where usuario_id = $1 and rol <> 'dueno' and ($3 = 'dueno' or rol in ('cajero', 'bodeguero'))`,
-      [otro, activo, rol, nuevoRol]);
+      [otro, activo, rol, nuevoRol, permisos === null ? null : new ArregloPg(permisos)]);
     if (res.rowCount === 0) throw prohibido("No puedes cambiar a esa persona");
     const nombre = textoOpcional(c.nombre, "El nombre", { max: 80 });
     // El nombre es de la persona (sirve en todos sus negocios): solo se pone si aún no tiene
     if (nombre) await db.query("update auth.usuario set nombre = $2 where id = $1 and nombre is null", [otro, nombre]);
-    return { activo, rol: nuevoRol };
+    return { activo, rol: nuevoRol, permisos };
   });
 
   r.negocio("PATCH", "/negocio/config", async (p, { db, rol }) => {

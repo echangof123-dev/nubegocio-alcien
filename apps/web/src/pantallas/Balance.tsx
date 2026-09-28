@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, mensajeDe } from "../api";
 import type { InfoNegocio } from "../tipos";
-import { puedeGestionar } from "../tipos";
+import { puede } from "../tipos";
 import { dinero } from "../formato";
 import { Aviso, Cargando } from "../componentes/basicos";
 import { IMas } from "../componentes/iconos";
@@ -30,7 +30,7 @@ const diaCorto = (iso: string) => new Date(iso).toLocaleDateString("es-EC", { we
 
 /** Balance: lo que entró y lo que salió, como la pantalla principal de Treinta. */
 export function Balance({ info, avisar, navegar }: { info: InfoNegocio; avisar: (t: string) => void; navegar: (r: string) => void }) {
-  const gestiona = puedeGestionar(info.rol);
+  const gestiona = puede(info, "reportes");
   const [periodo, setPeriodo] = useState<Periodo>("hoy");
   const [vista, setVista] = useState<"ingresos" | "egresos">("ingresos");
   const [datos, setDatos] = useState<BalanceDatos | null>(null);
@@ -52,7 +52,7 @@ export function Balance({ info, avisar, navegar }: { info: InfoNegocio; avisar: 
 
   return (
     <div className="contenido" style={{ maxWidth: 720, width: "100%", margin: "0 auto" }}>
-      <h1>Balance</h1>
+      <div className="fila"><h1>Balance</h1><button className="boton secundario pequeno" onClick={() => navegar("/asistente")}>Asistente</button></div>
       {gestiona && (
         <div className="chips" role="group" aria-label="Periodo">
           {([["hoy", "Hoy"], ["ayer", "Ayer"], ["semana", "7 días"], ["mes", "Este mes"]] as const).map(([p, t]) => (

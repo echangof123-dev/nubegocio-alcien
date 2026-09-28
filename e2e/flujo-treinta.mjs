@@ -174,6 +174,32 @@ try {
   await esperarTexto("Compra útiles para 3 hijos");
   await foto("cliente");
 
+  // Asistente: pregunta y registra una venta escribiendo
+  await pagina.goto(BASE + "/asistente");
+  await pagina.getByLabel("Escribe tu pregunta").fill("vendí 2 cuadernos y un esfero en efectivo");
+  await pagina.getByRole("button", { name: "Enviar" }).click();
+  await esperarTexto("¿Registro esta venta en efectivo?");
+  await pagina.getByRole("button", { name: "Registrar venta de $ 3,40" }).click();
+  await esperarTexto("Listo: venta N.º 2");
+  await pagina.getByRole("button", { name: "¿Cuánto vendí hoy?" }).last().click().catch(async () => {
+    await pagina.getByLabel("Escribe tu pregunta").fill("¿Cuánto vendí hoy?");
+    await pagina.getByRole("button", { name: "Enviar" }).click();
+  });
+  await esperarTexto("Hoy vendiste $ 11,40 en 2 ventas");
+  await foto("asistente");
+
+  // Permisos: el cajero puede anular ventas
+  await pagina.goto(BASE + "/equipo");
+  await pagina.getByRole("button", { name: "Agregar persona" }).click();
+  await pagina.getByLabel("Nombre").fill("Cajero Luis");
+  await pagina.getByLabel("Celular").fill("09" + String(Date.now() + 61).slice(-8));
+  await pagina.getByRole("button", { name: "Agregar", exact: true }).click();
+  await esperarTexto("Cajero Luis");
+  await pagina.getByRole("button", { name: "Cambiar" }).click();
+  await pagina.getByLabel(/Anular ventas/).check();
+  await esperarTexto("1 permisos extra");
+  await foto("permisos");
+
   if (errores.length) throw new Error("Errores en la consola del navegador:\n" + errores.join("\n"));
   console.log(`✔ Recorrido como Treinta sin errores (${n} capturas en e2e/capturas/treinta)`);
 } catch (e) {

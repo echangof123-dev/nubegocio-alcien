@@ -5,6 +5,7 @@ import type { Router } from "../http/servidor.js";
 import { invalido, noEncontrado, prohibido } from "../http/errores.js";
 import { numero, numeroOpcional, objeto, opcion, texto, textoOpcional, uuid } from "../http/validar.js";
 import { clasificar } from "../sri/identificacion.js";
+import { puede } from "./comun.js";
 
 const h = (t: unknown) => String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const soloGestion = (rol: string) => {
@@ -186,8 +187,9 @@ ${Number(a.por_pagar) > 0 ? fila("Queda por pagar", `$ ${num(a.por_pagar)}`, tru
 
   // ---------- Reportes por periodo ----------
 
-  r.negocio("GET", "/reportes", async (p, { db, rol }) => {
-    soloGestion(rol);
+  r.negocio("GET", "/reportes", async (p, ctx) => {
+    const { db } = ctx;
+    if (!puede(ctx, "reportes")) throw prohibido("No tienes permiso para ver reportes");
     const hasta = fechaIso(p.query.get("hasta"), "Hasta", hoyEc());
     const desde = fechaIso(p.query.get("desde"), "Desde", hasta);
     const { rows } = await db.query<{ r: unknown }>("select app.reporte_periodo($1, $2) as r", [desde, hasta]);
@@ -195,8 +197,9 @@ ${Number(a.por_pagar) > 0 ? fila("Queda por pagar", `$ ${num(a.por_pagar)}`, tru
   });
 
   /** Detalle de ventas del periodo en CSV (se abre en Excel). */
-  r.negocio("GET", "/reportes/ventas.csv", async (p, { db, rol }) => {
-    soloGestion(rol);
+  r.negocio("GET", "/reportes/ventas.csv", async (p, ctx) => {
+    const { db } = ctx;
+    if (!puede(ctx, "reportes")) throw prohibido("No tienes permiso para ver reportes");
     const hasta = fechaIso(p.query.get("hasta"), "Hasta", hoyEc());
     const desde = fechaIso(p.query.get("desde"), "Desde", hasta);
     const { rows } = await db.query<Record<string, unknown>>(

@@ -11,6 +11,8 @@ export interface ContextoNegocio {
   usuarioId: string;
   negocioId: string;
   rol: "dueno" | "administrador" | "cajero" | "bodeguero";
+  /** Permisos extra del empleado (precios, anular, productos, compras, reportes, gastos). */
+  permisos: string[];
   /** Tarea que corre después del COMMIT (por ejemplo, enviar al SRI lo recién firmado). */
   alConfirmar(tarea: () => Promise<unknown>): void;
 }
@@ -97,9 +99,11 @@ export class Pool implements Consultable {
   async enNegocio<R>(usuarioId: string, negocioId: string, fn: (ctx: ContextoNegocio) => Promise<R>): Promise<R> {
     const tareas: (() => Promise<unknown>)[] = [];
     const r = await this.transaccion(async (db) => {
-      const { rows } = await db.query<{ rol: ContextoNegocio["rol"] }>(
-        "select app.entrar_negocio($1, $2) as rol", [usuarioId, negocioId]);
-      return fn({ db, usuarioId, negocioId, rol: rows[0]!.rol, alConfirmar: (t) => { tareas.push(t); } });
+      const { rows } = await db.query<{ rol: ContextoNegocio["rol"]; permisos: string | null }>(
+        "select e.rol, current_setting('app.permisos', true) as permisos from app.entrar_negocio($1, $2) as e(rol)", [usuarioId, negocioId]);
+      const rol = rows[0]!.rol;
+      const permisos = (rows[0]!.permisos ?? "").split(",").filter(Boolean);
+      return fn({ db, usuarioId, negocioId, rol, permisos, alConfirmar: (t) => { tareas.push(t); } });
     });
     for (const t of tareas) t().catch(() => {});   // cada tarea registra sus propios errores
     return r;

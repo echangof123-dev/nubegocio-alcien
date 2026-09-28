@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, archivo, mensajeDe } from "../api";
 import type { InfoNegocio } from "../tipos";
-import { puedeGestionar } from "../tipos";
+import { puede } from "../tipos";
 import { cantidad as fmtCantidad, dinero, redondear } from "../formato";
 import { Aviso, Cargando } from "../componentes/basicos";
 import { diaLocal, sumarDias } from "../componentes/servicios";
@@ -42,13 +42,13 @@ export function Estadisticas({ info, avisar }: { info: InfoNegocio; avisar: (t: 
   const [desde, hasta] = propio ?? rango(periodo);
 
   useEffect(() => {
-    if (!puedeGestionar(info.rol)) return;
+    if (!puede(info, "reportes")) return;
     setRep(null);
     api<{ reporte: Reporte }>("GET", `/reportes?desde=${desde}&hasta=${hasta}`)
       .then((r) => { setRep(r.reporte); setError(null); }).catch((e) => setError(mensajeDe(e)));
-  }, [desde, hasta, info.rol]);
+  }, [desde, hasta, info]);
 
-  if (!puedeGestionar(info.rol)) {
+  if (!puede(info, "reportes")) {
     return <div className="contenido"><Aviso tipo="info" titulo="Solo para el dueño o un administrador">Tus ventas del día están en Reportes.</Aviso></div>;
   }
 

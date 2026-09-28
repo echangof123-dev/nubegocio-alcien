@@ -1,4 +1,5 @@
 import type { Router } from "../http/servidor.js";
+import { puede } from "./comun.js";
 import { invalido, noEncontrado, prohibido } from "../http/errores.js";
 import { booleano, numero, numeroOpcional, objeto, texto, textoOpcional, uuid, uuidOpcional } from "../http/validar.js";
 
@@ -18,8 +19,9 @@ export function rutasProductos(r: Router) {
     return { categorias: rows };
   });
 
-  r.negocio("POST", "/categorias", async (p, { db, rol }) => {
-    if (rol === "cajero") throw prohibido();
+  r.negocio("POST", "/categorias", async (p, ctx) => {
+    const { db, rol } = ctx;
+    if (rol === "cajero" && !puede(ctx, "productos")) throw prohibido();
     const nombre = texto(objeto(p.cuerpo).nombre, "El nombre de la categoría", { max: 60 });
     const { rows } = await db.query(
       `insert into app.categoria (negocio_id, nombre, orden)
@@ -56,8 +58,9 @@ export function rutasProductos(r: Router) {
     return { producto: rows[0] };
   });
 
-  r.negocio("POST", "/productos", async (p, { db, rol }) => {
-    if (rol === "cajero") throw prohibido();
+  r.negocio("POST", "/productos", async (p, ctx) => {
+    const { db, rol } = ctx;
+    if (rol === "cajero" && !puede(ctx, "productos")) throw prohibido();
     const c = objeto(p.cuerpo);
     const valores = [
       texto(c.nombre, "El nombre", { max: 80 }),
@@ -86,8 +89,9 @@ export function rutasProductos(r: Router) {
     return { status: 201, cuerpo: { producto: prod[0] } };
   });
 
-  r.negocio("PATCH", "/productos/:id", async (p, { db, rol }) => {
-    if (rol === "cajero") throw prohibido();
+  r.negocio("PATCH", "/productos/:id", async (p, ctx) => {
+    const { db, rol } = ctx;
+    if (rol === "cajero" && !puede(ctx, "productos")) throw prohibido();
     const id = uuid(p.params.id, "El producto");
     const c = objeto(p.cuerpo);
     const campos: [string, unknown][] = [];

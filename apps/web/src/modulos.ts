@@ -11,6 +11,7 @@ export interface PantallaModulo {
 
 export const PANTALLAS: PantallaModulo[] = [
   // "*": pantallas de todos los negocios (como en Treinta)
+  { modulo: "*", ruta: "/asistente", nombre: "Asistente", descripcion: "Pregunta cómo va tu negocio o anota ventas escribiendo" },
   { modulo: "*", ruta: "/clientes", nombre: "Clientes", descripcion: "Historial, notas y quién te debe" },
   { modulo: "*", ruta: "/gastos", nombre: "Gastos", descripcion: "Arriendo, servicios, nómina y más" },
   { modulo: "M04", ruta: "/inventario", nombre: "Inventario", descripcion: "Valor, stock bajo y carga desde Excel" },

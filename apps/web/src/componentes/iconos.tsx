@@ -48,5 +48,6 @@ export const ICalendario = (p: P) => <Icono {...p}><rect x="3" y="5" width="18" 
 export const ILlave = (p: P) => <Icono {...p}><path d="M14.5 5.5a4.5 4.5 0 0 0 5.6 5.6L12 19.2a2 2 0 0 1-2.8 0l-.4-.4a2 2 0 0 1 0-2.8l8.1-8.1" /><path d="M14.5 5.5L17 3l4 4-2.5 2.5" /></Icono>;
 export const ICama = (p: P) => <Icono {...p}><path d="M3 18V6M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5" /><circle cx="7" cy="11" r="2" /></Icono>;
 export const ICarnet = (p: P) => <Icono {...p}><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="11" r="2.2" /><path d="M5.5 16c.6-1.6 1.9-2.4 3.5-2.4s2.9.8 3.5 2.4M14 10h4M14 13h3" /></Icono>;
+export const IChat = (p: P) => <Icono {...p}><path d="M4 5h16v11H9l-5 4z" /><path d="M8 9.5h8M8 12.5h5" /></Icono>;
 export const IBalanza = (p: P) => <Icono {...p}><path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z" /></Icono>;
 export const IGrafico = (p: P) => <Icono {...p}><path d="M3 3v18h18" /><path d="M7 15l4-4 3 3 5-6" /></Icono>;

@@ -3,7 +3,7 @@ import { FotoProducto } from "../componentes/foto";
 import { HistorialProducto } from "./Inventario";
 import { api, mensajeDe } from "../api";
 import type { Categoria, InfoNegocio, Producto } from "../tipos";
-import { puedeGestionar, tieneModulo } from "../tipos";
+import { puede, puedeGestionar, tieneModulo } from "../tipos";
 import { cantidad as fmtCantidad, dinero, parsearNumero } from "../formato";
 import { Aviso, CampoMonto, Cargando, Dialogo } from "../componentes/basicos";
 import { IBuscar, IMas } from "../componentes/iconos";
@@ -27,7 +27,7 @@ export function Productos({ info, avisar }: { info: InfoNegocio; avisar: (t: str
     (!soloSinPrecio || p.precio === null) && p.nombre.toLowerCase().includes(texto.trim().toLowerCase())), [productos, texto, soloSinPrecio]);
 
   if (!productos) return <Cargando />;
-  const gestiona = puedeGestionar(info.rol) || info.rol === "bodeguero";
+  const gestiona = puedeGestionar(info.rol) || info.rol === "bodeguero" || puede(info, "productos");
   const sinPrecio = productos.filter((p) => p.precio === null).length;
 
   return (

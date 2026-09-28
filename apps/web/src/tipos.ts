@@ -34,7 +34,7 @@ export interface Negocio {
   mensaje_recibo?: string | null;
 }
 
-export interface InfoNegocio { negocio: Negocio; rol: Rol; modulos: Modulo[] }
+export interface InfoNegocio { negocio: Negocio; rol: Rol; modulos: Modulo[]; permisos?: string[] }
 
 export interface Categoria { id: string; nombre: string; orden: number; productos: number }
 
@@ -151,6 +151,9 @@ export const tieneModulo = (info: InfoNegocio, m: string) =>
   info.modulos.some((x) => x.modulo === m && x.estado === "activo");
 
 export const puedeGestionar = (rol: Rol) => rol === "dueno" || rol === "administrador";
+export type Permiso = "precios" | "anular" | "productos" | "compras" | "reportes" | "gastos";
+/** El dueño y el administrador pueden todo; los demás, lo que se les activó en Equipo. */
+export const puede = (info: InfoNegocio, p: Permiso) => puedeGestionar(info.rol) || (info.permisos ?? []).includes(p);
 
 /** Unidades que se venden con decimales (por peso o medida). */
 export const esPorPeso = (unidad: string) =>

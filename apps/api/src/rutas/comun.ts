@@ -32,3 +32,7 @@ export async function facturarSiToca(ctx: ContextoNegocio, sri: ServicioSri, ven
   ctx.alConfirmar(() => sri.enviar(firmados));
   return rows[0] ?? null;
 }
+
+/** Como app.tiene_permiso: el dueño y el administrador pueden todo; los demás, lo que se les activó. */
+export const puede = (ctx: { rol: string; permisos: string[] }, permiso: string) =>
+  ctx.rol === "dueno" || ctx.rol === "administrador" || ctx.permisos.includes(permiso);

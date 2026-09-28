@@ -2,6 +2,7 @@
  * Tanda 1 de módulos: catálogo de módulos, proveedores y compras (M15), lotes (M16) y cotizaciones (M24).
  */
 import type { Router } from "../http/servidor.js";
+import { puede } from "./comun.js";
 import type { Pool } from "../db/pool.js";
 import type { ServicioSri } from "../sri/servicio.js";
 import { invalido, noEncontrado, prohibido } from "../http/errores.js";
@@ -68,8 +69,9 @@ export function rutasCompras(r: Router, dep: { pool: Pool; sri: ServicioSri }) {
     return { proveedores: rows };
   });
 
-  r.negocio("POST", "/proveedores", async (p, { db, rol }) => {
-    if (rol === "cajero") throw prohibido();
+  r.negocio("POST", "/proveedores", async (p, ctx) => {
+    const { db, rol } = ctx;
+    if (rol === "cajero" && !puede(ctx, "compras")) throw prohibido();
     await db.query("select app.exigir_modulo('M15')");
     const c = objeto(p.cuerpo);
     const ruc = textoOpcional(c.ruc, "El RUC o cédula", { max: 13 });

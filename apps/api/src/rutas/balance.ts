@@ -7,10 +7,9 @@ import type { Pool } from "../db/pool.js";
 import type { ServicioSri } from "../sri/servicio.js";
 import { invalido, noEncontrado, prohibido } from "../http/errores.js";
 import { lista, numero, objeto, opcion, texto, textoOpcional, uuid, uuidOpcional } from "../http/validar.js";
-import { facturarSiToca, leerComprobante, leerPagos } from "./comun.js";
+import { facturarSiToca, leerComprobante, leerPagos, puede } from "./comun.js";
 
 const h = (t: unknown) => String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const gestion = (rol: string) => rol === "dueno" || rol === "administrador";
 const hoyEc = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
 const fechaQ = (v: string | null, campo: string, defecto: string) => {
   const t = v ?? defecto;
@@ -34,19 +33,21 @@ export function csv(cols: string[], filas: Record<string, unknown>[]): string {
 export function rutasBalance(r: Router, dep: { pool: Pool; sri: ServicioSri }) {
   // ---------- Balance ----------
 
-  r.negocio("GET", "/balance", async (p, { db, rol }) => {
+  r.negocio("GET", "/balance", async (p, ctx) => {
+    const { db } = ctx;
     const hasta = fechaQ(p.query.get("hasta"), "Hasta", hoyEc());
     const desde = fechaQ(p.query.get("desde"), "Desde", hasta);
     // El cajero ve el balance del día (como su caja); periodos más largos, el dueño o el administrador
-    if (!gestion(rol) && (desde !== hoyEc() || hasta !== hoyEc())) throw prohibido("Solo el dueño o un administrador ven otros días");
+    if (!puede(ctx, "reportes") && (desde !== hoyEc() || hasta !== hoyEc())) throw prohibido("Solo el dueño o un administrador ven otros días");
     const { rows } = await db.query<{ b: unknown }>("select app.balance_periodo($1, $2) as b", [desde, hasta]);
     return { balance: rows[0]!.b };
   });
 
   // ---------- Gastos ----------
 
-  r.negocio("GET", "/gastos", async (p, { db, rol }) => {
-    if (rol === "bodeguero") throw prohibido();
+  r.negocio("GET", "/gastos", async (p, ctx) => {
+    const { db, rol } = ctx;
+    if (rol === "bodeguero" && !puede(ctx, "gastos")) throw prohibido();
     const hasta = fechaQ(p.query.get("hasta"), "Hasta", hoyEc());
     const desde = fechaQ(p.query.get("desde"), "Desde", hasta);
     const { rows } = await db.query(
@@ -147,8 +148,9 @@ ${imprimir ? "<script>window.addEventListener('load',()=>setTimeout(()=>window.p
 
   // ---------- Inventario ----------
 
-  r.negocio("GET", "/inventario", async (_p, { db, rol }) => {
-    const verCostos = rol !== "cajero";
+  r.negocio("GET", "/inventario", async (_p, ctx) => {
+    const { db, rol } = ctx;
+    const verCostos = rol === "bodeguero" || puede(ctx, "reportes");
     const { rows } = await db.query<Record<string, any>>(
       `select count(*) filter (where maneja_stock) as productos,
               coalesce(sum(stock * costo) filter (where maneja_stock and stock > 0 and costo is not null), 0) as valor_costo,
@@ -203,8 +205,9 @@ ${imprimir ? "<script>window.addEventListener('load',()=>setTimeout(()=>window.p
 
   // ---------- Fotos de productos ----------
 
-  r.negocio("POST", "/productos/:id/foto", async (p, { db, rol }) => {
-    if (rol === "cajero") throw prohibido();
+  r.negocio("POST", "/productos/:id/foto", async (p, ctx) => {
+    const { db, rol } = ctx;
+    if (rol === "cajero" && !puede(ctx, "productos")) throw prohibido();
     const id = uuid(p.params.id, "El producto");
     const c = objeto(p.cuerpo);
     const tipo = opcion(c.tipo, "El tipo de imagen", ["image/jpeg", "image/webp", "image/png"] as const);
@@ -228,8 +231,9 @@ ${imprimir ? "<script>window.addEventListener('load',()=>setTimeout(()=>window.p
     return { status: 201, cuerpo: { foto_version: rows[0]!.foto_version } };
   });
 
-  r.negocio("DELETE", "/productos/:id/foto", async (p, { db, rol }) => {
-    if (rol === "cajero") throw prohibido();
+  r.negocio("DELETE", "/productos/:id/foto", async (p, ctx) => {
+    const { db, rol } = ctx;
+    if (rol === "cajero" && !puede(ctx, "productos")) throw prohibido();
     const id = uuid(p.params.id, "El producto");
     await db.query("delete from app.producto_foto where producto_id = $1", [id]);
     await db.query("update app.producto set foto_version = null where id = $1", [id]);
@@ -247,8 +251,9 @@ ${imprimir ? "<script>window.addEventListener('load',()=>setTimeout(()=>window.p
 
   // ---------- Descargas para Excel ----------
 
-  r.negocio("GET", "/reportes/gastos.csv", async (p, { db, rol }) => {
-    if (!gestion(rol)) throw prohibido("Solo el dueño o un administrador descargan reportes");
+  r.negocio("GET", "/reportes/gastos.csv", async (p, ctx) => {
+    const { db } = ctx;
+    if (!puede(ctx, "reportes")) throw prohibido("Solo el dueño o un administrador descargan reportes");
     const hasta = fechaQ(p.query.get("hasta"), "Hasta", hoyEc());
     const desde = fechaQ(p.query.get("desde"), "Desde", hasta);
     const { rows } = await db.query<Record<string, unknown>>(
@@ -259,8 +264,9 @@ ${imprimir ? "<script>window.addEventListener('load',()=>setTimeout(()=>window.p
       cuerpo: csv(["fecha", "categoria", "descripcion", "monto", "metodo", "estado", "proveedor", "registrado_por"], rows) } };
   });
 
-  r.negocio("GET", "/reportes/inventario.csv", async (_p, { db, rol }) => {
-    if (rol === "cajero") throw prohibido();
+  r.negocio("GET", "/reportes/inventario.csv", async (_p, ctx) => {
+    const { db, rol } = ctx;
+    if (rol === "cajero" && !puede(ctx, "reportes")) throw prohibido();
     const { rows } = await db.query<Record<string, unknown>>(
       `select p.nombre, c.nombre as categoria, p.unidad, p.codigo_barras, p.precio, p.costo, p.stock, p.stock_minimo,
               case when p.costo is not null and p.stock > 0 then round(p.stock * p.costo, 2) end as valor_costo

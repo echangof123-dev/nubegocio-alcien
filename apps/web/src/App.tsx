@@ -37,6 +37,7 @@ import { Gastos } from "./pantallas/Gastos";
 import { Clientes } from "./pantallas/Clientes";
 import { Inventario } from "./pantallas/Inventario";
 import { Ajustes } from "./pantallas/Ajustes";
+import { Asistente } from "./pantallas/Asistente";
 import { PANTALLAS, titulo } from "./modulos";
 
 function useRuta(): [string, (r: string) => void] {
@@ -183,6 +184,7 @@ export function App() {
     case "/membresias": pantalla = <Membresias info={info} avisar={avisar} />; break;
     case "/acopio": pantalla = <Acopio info={info} avisar={avisar} />; break;
     case "/estadisticas": pantalla = <Estadisticas info={info} avisar={avisar} />; break;
+    case "/asistente": pantalla = <Asistente info={info} avisar={avisar} navegar={navegar} />; break;
     case "/balance": pantalla = <Balance info={info} avisar={avisar} navegar={navegar} />; break;
     case "/gastos": pantalla = <Gastos info={info} avisar={avisar} />; break;
     case "/clientes": pantalla = <Clientes info={info} avisar={avisar} />; break;

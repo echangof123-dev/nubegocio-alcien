@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, archivo, mensajeDe } from "../api";
 import type { InfoNegocio } from "../tipos";
-import { puedeGestionar } from "../tipos";
+import { puede, puedeGestionar } from "../tipos";
 import { dinero, fecha } from "../formato";
 import { Cargando, Dialogo } from "../componentes/basicos";
 import { IMas } from "../componentes/iconos";
@@ -28,6 +28,7 @@ export function Gastos({ info, avisar }: { info: InfoNegocio; avisar: (t: string
   const [nuevo, setNuevo] = useState(false);
   const [anular, setAnular] = useState<Gasto | null>(null);
   const gestiona = puedeGestionar(info.rol);
+  const descarga = puede(info, "reportes");
 
   const cargar = useCallback(() => {
     api<{ gastos: Gasto[] }>("GET", `/gastos?desde=${desde}&hasta=${hasta}`).then((r) => setGastos(r.gastos)).catch(() => setGastos([]));
@@ -88,7 +89,7 @@ export function Gastos({ info, avisar }: { info: InfoNegocio; avisar: (t: string
               </div>
             ))}
           </div>
-          {gestiona && (
+          {descarga && (
             <button className="boton secundario" onClick={() => archivo(`/reportes/gastos.csv?desde=${desde}&hasta=${hasta}`, { descargar: `gastos-${desde}-a-${hasta}.csv` }).catch((e) => avisar(mensajeDe(e)))}>
               Descargar gastos para Excel
             </button>

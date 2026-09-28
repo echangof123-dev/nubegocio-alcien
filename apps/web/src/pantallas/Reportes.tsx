@@ -2,7 +2,7 @@ import { imprimirRecibo, whatsappRecibo } from "../componentes/recibo";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, mensajeDe } from "../api";
 import type { InfoNegocio } from "../tipos";
-import { puedeGestionar } from "../tipos";
+import { puede } from "../tipos";
 import type { EstadoComprobante } from "../tipos";
 import { EstadoSri } from "../componentes/comprobante";
 import { dinero, hora } from "../formato";
@@ -44,7 +44,7 @@ export function Reportes({ info, avisar, alSalir, alCambiarNegocio, navegar }: {
         <div className="tarjeta" style={{ gap: 2 }}><span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>Te deben</span><span className="monto-grande">{dinero(resumen.fiado_por_cobrar)}</span></div>
       </div>
 
-      {puedeGestionar(info.rol) && <button className="boton secundario" onClick={() => navegar("/estadisticas")}>Ver reportes por periodo</button>}
+      {puede(info, "reportes") && <button className="boton secundario" onClick={() => navegar("/estadisticas")}>Ver reportes por periodo</button>}
       <div className="tarjeta" style={{ padding: "12px 16px" }}>
         <h3>Ventas de hoy</h3>
         <div className="tabla-simple">
@@ -63,7 +63,7 @@ export function Reportes({ info, avisar, alSalir, alCambiarNegocio, navegar }: {
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <strong className={v.estado === "anulada" ? "anulada" : ""}>{dinero(v.total)}</strong>
-                {v.estado !== "anulada" && puedeGestionar(info.rol) && (
+                {v.estado !== "anulada" && puede(info, "anular") && (
                   <button className="boton texto pequeno" onClick={() => setAnular(v)}>Anular</button>
                 )}
               </span>

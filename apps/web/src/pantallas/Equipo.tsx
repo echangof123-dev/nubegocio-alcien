@@ -5,7 +5,7 @@ import { puedeGestionar } from "../tipos";
 import { Aviso, Cargando, Dialogo } from "../componentes/basicos";
 import { IMas } from "../componentes/iconos";
 
-interface Miembro { id: string; nombre: string | null; celular: string; rol: Rol; activo: boolean }
+interface Miembro { id: string; nombre: string | null; celular: string; rol: Rol; activo: boolean; permisos: string[] }
 
 const ROLES: Record<Rol, [string, string]> = {
   dueno: ["Dueño", "Todo"],
@@ -13,6 +13,15 @@ const ROLES: Record<Rol, [string, string]> = {
   cajero: ["Cajero", "Vende, cobra y abre la caja. No cambia precios ni anula"],
   bodeguero: ["Bodeguero", "Productos, stock y compras. No vende"],
 };
+
+const PERMISOS: [string, string, string][] = [
+  ["precios", "Cambiar precios y dar descuentos", "Al vender puede poner otro precio o un descuento"],
+  ["anular", "Anular ventas", "Devuelve el stock y el dinero sale de la caja"],
+  ["productos", "Crear y editar productos", "Nombre, precio, fotos y ajustes de stock"],
+  ["compras", "Registrar compras", "Proveedores, compras y lotes"],
+  ["reportes", "Ver reportes y ganancias", "Balance de otros días, reportes por periodo y descargas"],
+  ["gastos", "Registrar gastos", "Solo hace falta para el bodeguero; el cajero ya puede"],
+];
 
 export function Equipo({ info, avisar }: { info: InfoNegocio; avisar: (t: string) => void }) {
   const [equipo, setEquipo] = useState<Miembro[] | null>(null);
@@ -40,7 +49,7 @@ export function Equipo({ info, avisar }: { info: InfoNegocio; avisar: (t: string
           <div key={m.id} className="comprobante-fila">
             <div className="textos">
               <strong className={m.activo ? "" : "anulada"}>{m.nombre ?? m.celular}</strong>
-              <span>{m.nombre ? `${m.celular} · ` : ""}{ROLES[m.rol][0]}</span>
+              <span>{m.nombre ? `${m.celular} · ` : ""}{ROLES[m.rol][0]}{m.permisos?.length ? ` · ${m.permisos.length} permisos extra` : ""}</span>
             </div>
             {gestiona && m.rol !== "dueno" && (info.rol === "dueno" || m.rol !== "administrador") && (
               <button className="boton texto pequeno" onClick={() => setEditar(m)}>Cambiar</button>
@@ -61,6 +70,26 @@ export function Equipo({ info, avisar }: { info: InfoNegocio; avisar: (t: string
               </button>
             ))}
           </div>
+          {(editar.rol === "cajero" || editar.rol === "bodeguero") && (
+            <>
+              <span className="etiqueta" style={{ marginTop: 8 }}>Permisos extra</span>
+              {PERMISOS.map(([k, t, d]) => {
+                const activo = editar.permisos.includes(k);
+                return (
+                  <label key={k} className="casilla" style={{ alignItems: "flex-start" }}>
+                    <input type="checkbox" checked={activo} onChange={async () => {
+                      const permisos = activo ? editar.permisos.filter((x) => x !== k) : [...editar.permisos, k];
+                      const antes = editar;
+                      setEditar({ ...editar, permisos });
+                      try { await api("PATCH", `/negocio/equipo/${editar.id}`, { permisos }); cargar(); }
+                      catch (e) { setEditar(antes); avisar(mensajeDe(e)); }
+                    }} />
+                    <span style={{ display: "flex", flexDirection: "column" }}><strong>{t}</strong><span className="muted" style={{ fontSize: 13 }}>{d}</span></span>
+                  </label>
+                );
+              })}
+            </>
+          )}
           <button className={`boton bloque ${editar.activo ? "peligro" : "secundario"}`} onClick={() => { cambiar(editar); setEditar(null); }}>
             {editar.activo ? "Quitar acceso" : "Devolver acceso"}
           </button>
