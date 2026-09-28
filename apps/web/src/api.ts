@@ -52,3 +52,27 @@ export async function api<T>(metodo: "GET" | "POST" | "PATCH" | "DELETE", ruta: 
 }
 
 export const mensajeDe = (e: unknown) => (e instanceof Error ? e.message : "Algo salió mal. Intenta de nuevo.");
+
+/** Pide un archivo del negocio (CSV, HTML) con la sesión y el X-Negocio, y lo guarda o lo abre. */
+export async function archivo(ruta: string, modo: { descargar: string } | "abrir"): Promise<void> {
+  const ventana = modo === "abrir" ? window.open("", "_blank") : null;
+  const r = await fetch("/api" + ruta, { credentials: "same-origin", headers: negocioActual ? { "x-negocio": negocioActual } : {} })
+    .catch(() => { throw new ErrorApi(0, "Sin conexión. Revisa tu internet e intenta de nuevo.", "red"); });
+  if (!r.ok) {
+    ventana?.close();
+    const d = (await r.json().catch(() => ({}))) as { error?: string; codigo?: string };
+    throw new ErrorApi(r.status, d.error ?? "No se pudo abrir el archivo.", d.codigo ?? "error");
+  }
+  const url = URL.createObjectURL(await r.blob());
+  if (modo === "abrir") {
+    if (ventana) ventana.location.href = url; else window.location.href = url;
+  } else {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = modo.descargar;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

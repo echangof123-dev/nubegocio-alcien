@@ -15,11 +15,12 @@ export function Dialogo({ titulo, alCerrar, children }: { titulo: string; alCerr
   }, []);
 
   return (
-    <div className="fondo-dialogo" onClick={(e) => { if (e.target === e.currentTarget) alCerrar(); }}>
+    // Un diálogo puede abrirse dentro de otro formulario: su envío no debe subir al de afuera
+    <div className="fondo-dialogo" onSubmit={(e) => e.stopPropagation()} onClick={(e) => { if (e.target === e.currentTarget) alCerrar(); }}>
       <div className="dialogo" role="dialog" aria-modal="true" aria-label={titulo} ref={ref}>
         <div className="fila">
           <h2>{titulo}</h2>
-          <button className="icono-boton cerrar-dialogo" onClick={alCerrar} aria-label="Cerrar"><ICerrar /></button>
+          <button type="button" className="icono-boton cerrar-dialogo" onClick={alCerrar} aria-label="Cerrar"><ICerrar /></button>
         </div>
         {children}
       </div>

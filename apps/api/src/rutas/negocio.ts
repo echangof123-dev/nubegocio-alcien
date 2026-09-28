@@ -118,13 +118,19 @@ export function rutasNegocio(r: Router, dep: { pool: Pool; ia: GeneradorPlantill
     if (rol !== "dueno" && rol !== "administrador") throw prohibido();
     const otro = uuid(p.params.usuario, "El usuario");
     if (otro === usuarioId) throw prohibido("No puedes cambiarte a ti mismo");
-    const activo = booleano(objeto(p.cuerpo).activo, "activo");
+    const c = objeto(p.cuerpo);
+    const activo = c.activo === undefined ? null : booleano(c.activo, "activo");
+    const nuevoRol = c.rol === undefined ? null : opcion(c.rol, "El rol", ["administrador", "cajero", "bodeguero"] as const);
+    if (nuevoRol === "administrador" && rol !== "dueno") throw prohibido("Solo el dueño nombra administradores");
     const res = await db.query(
-      `update app.membresia set activo = $2
+      `update app.membresia set activo = coalesce($2, activo), rol = coalesce($4, rol)
        where usuario_id = $1 and rol <> 'dueno' and ($3 = 'dueno' or rol in ('cajero', 'bodeguero'))`,
-      [otro, activo, rol]);
+      [otro, activo, rol, nuevoRol]);
     if (res.rowCount === 0) throw prohibido("No puedes cambiar a esa persona");
-    return { activo };
+    const nombre = textoOpcional(c.nombre, "El nombre", { max: 80 });
+    // El nombre es de la persona (sirve en todos sus negocios): solo se pone si aún no tiene
+    if (nombre) await db.query("update auth.usuario set nombre = $2 where id = $1 and nombre is null", [otro, nombre]);
+    return { activo, rol: nuevoRol };
   });
 
   r.negocio("PATCH", "/negocio/config", async (p, { db, rol }) => {

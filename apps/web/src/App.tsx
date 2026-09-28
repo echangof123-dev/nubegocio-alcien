@@ -30,6 +30,8 @@ import { Profesionales } from "./pantallas/Profesionales";
 import { Ordenes } from "./pantallas/Ordenes";
 import { Reservas } from "./pantallas/Reservas";
 import { Membresias } from "./pantallas/Membresias";
+import { Acopio } from "./pantallas/Acopio";
+import { Estadisticas } from "./pantallas/Estadisticas";
 import { PANTALLAS, titulo } from "./modulos";
 
 function useRuta(): [string, (r: string) => void] {
@@ -167,6 +169,8 @@ export function App() {
     case "/ordenes": pantalla = <Ordenes info={info} avisar={avisar} />; break;
     case "/reservas": pantalla = <Reservas info={info} avisar={avisar} />; break;
     case "/membresias": pantalla = <Membresias info={info} avisar={avisar} />; break;
+    case "/acopio": pantalla = <Acopio info={info} avisar={avisar} />; break;
+    case "/estadisticas": pantalla = <Estadisticas info={info} avisar={avisar} />; break;
     case "/reportes":
       pantalla = <Reportes info={info} avisar={avisar} alSalir={salir} navegar={navegar}
         alCambiarNegocio={sesion.negocios.length > 1 ? () => {

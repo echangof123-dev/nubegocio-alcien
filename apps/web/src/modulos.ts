@@ -19,6 +19,8 @@ export const PANTALLAS: PantallaModulo[] = [
   { modulo: "M26", ruta: "/reservas", nombre: "Reservas", descripcion: "Habitaciones, canchas o salones por fecha" },
   { modulo: "M22", ruta: "/membresias", nombre: "Membresías", descripcion: "Planes, asistencia y vencimientos" },
   { modulo: "M11|M12|M13", ruta: "/profesionales", nombre: "Profesionales", descripcion: "Quién atiende y sus comisiones" },
+  { modulo: "M25", ruta: "/acopio", nombre: "Acopio", descripcion: "Compra a productores por peso y humedad" },
+  { modulo: "M21", ruta: "/estadisticas", nombre: "Reportes por periodo", descripcion: "Ventas, utilidad, gastos y más vendidos" },
   { modulo: "M17", ruta: "/listas", nombre: "Listas de precios", descripcion: "Mayorista, distribuidor y por volumen" },
   { modulo: "M23", ruta: "/series", nombre: "Series", descripcion: "Series, IMEI y garantías" },
   { modulo: "M18", ruta: "/catalogo", nombre: "Catálogo en línea", descripcion: "Tu tienda para compartir por WhatsApp" },
@@ -33,7 +35,7 @@ export const PANTALLAS: PantallaModulo[] = [
 /** Módulos que funcionan dentro de otras pantallas (no tienen una propia). */
 export const INCLUIDOS: Record<string, string> = {
   M01: "En Vender", M02: "En Caja", M03: "En Caja", M04: "En Productos", M06: "En Vender",
-  M07: "En Vender y Productos", M21: "En Reportes", M05: "En Productos",
+  M07: "En Vender y Productos", M05: "En Productos",
 };
 
 export const tienePantalla = (modulo: string) => PANTALLAS.some((p) => p.modulo.split("|").includes(modulo)) || modulo in INCLUIDOS;

@@ -11,7 +11,8 @@ Al registrarse, el usuario dice qué negocio tiene y el sistema se arma solo: ac
 | 0 · Base | Base de datos, seguridad por fila, API, CI, imagen para Cloud Run | Listo y probado |
 | 1 · Alta automática | Acceso por WhatsApp, catálogo, búsqueda, motor de plantillas, tipos nuevos por IA, pantallas de registro | Listo y probado |
 | 2 · Vender | Productos, precios, venta por peso, código de barras, cobro con vuelto, pago mixto, fiado, caja, gastos, anulaciones | Listo y probado |
-| 3 · Control | Proveedores y compras, reportes por periodo, recordatorios de fiado por WhatsApp | Pendiente |
+| 3 · Control | Proveedores y compras, reportes por periodo con descarga para Excel, recordatorios de fiado por WhatsApp | Listo y probado (falta el envío automático de recordatorios de fiado) |
+| Módulos por negocio | Los 26 módulos de la matriz: mesas y cocina, recetas, pedidos y delivery, variantes, listas de precios, series y garantías, catálogo en línea, cotizaciones, lotes, agenda y comisiones, órdenes de trabajo, reservas, membresías, acopio con humedad y anticipos | Listo y probado (5 recorridos en navegador) |
 | 4 · SRI | Factura y nota de crédito electrónicas, firma XAdES-BES, envío y autorización con reintentos, RIDE para compartir | Listo y probado (con un SRI simulado; falta la prueba en el ambiente de pruebas real del SRI) |
 | 5 · Negocio | Planes y cobro recurrente con Kushki, panel de administración | Pendiente (el equipo y los roles ya funcionan) |
 
@@ -53,6 +54,11 @@ Sin dependencias de ejecución: usa `node:http`, `node:crypto` y un cliente prop
 | `GET /api/comprobantes`, `GET /api/comprobantes/:id`, `POST /api/comprobantes/:id/enviar`, `/reemitir`, `POST /api/ventas/:id/facturar` | Facturas y notas de crédito |
 | `GET /api/c/:token`, `GET /api/c/:token/xml` | RIDE público (el enlace que se envía al cliente) y XML autorizado |
 | `POST /api/tareas/sri` | Reintentos programados (Cloud Scheduler, con `ALCIEN_TOKEN_TAREAS`) |
+| `/api/proveedores`, `/api/compras`, `/api/lotes`, `/api/cotizaciones`, `GET /api/q/:token` | Compras, lotes y cotizaciones (`rutas/compras.ts`) |
+| `/api/mesas`, `/api/cuentas`, `/api/cocina`, `/api/pedidos`, `/api/recetas/:producto` | Restaurantes (`rutas/comida.ts`) |
+| `/api/listas`, `/api/series`, `/api/catalogo/*`, `GET /api/tienda/:slug` | Tiendas (`rutas/retail.ts`) |
+| `/api/profesionales`, `/api/comisiones`, `/api/citas`, `/api/ordenes`, `/api/recursos`, `/api/reservas`, `/api/planes-membresia`, `/api/membresias`, `/api/asistencias`, `GET /api/o/:token` | Servicios (`rutas/servicios.ts`) |
+| `/api/productores`, `/api/anticipos`, `/api/acopio`, `GET /api/reportes`, `GET /api/reportes/ventas.csv` | Acopio y reportes por periodo (`rutas/acopio.ts`) |
 
 Reglas de dinero (en la base, `app.registrar_venta`): el precio incluye IVA; base e IVA se calculan por línea; los pagos deben sumar el total; el cajero no cambia precios, no da descuentos ni anula; una venta anulada devuelve stock y revierte el fiado.
 
@@ -90,10 +96,11 @@ En desarrollo el código de acceso aparece en pantalla ("Modo de prueba"); en pr
 ## Pruebas
 
 ```bash
-bash db/scripts/test.sh            # 8 archivos de pruebas SQL
-bash apps/api/scripts/test.sh      # 22 pruebas de la API contra PostgreSQL real (con Python + lxml + cryptography verifica la firma)
+bash db/scripts/test.sh            # 13 archivos de pruebas SQL
+bash apps/api/scripts/test.sh      # 43 pruebas de la API contra PostgreSQL real (con Python + lxml + cryptography verifica la firma)
 node e2e/sri-falso.mjs &           # SRI de mentira para el recorrido (API con SRI_URL_PRUEBAS=http://127.0.0.1:9099/ws)
 BASE=http://localhost:8080 node e2e/flujo-venta.mjs   # recorrido completo en navegador, incluida una factura
+# y los recorridos por tipo de negocio: flujo-restaurante, flujo-ropa, flujo-servicios, flujo-acopio
 ```
 
 La CI de GitHub corre las tres en cada cambio y guarda las capturas del recorrido.
@@ -137,5 +144,7 @@ Los negocios existentes no cambian: al registrarse recibieron una copia.
 - Probar una factura real en el ambiente de pruebas del SRI con una firma real (la CI usa un SRI simulado).
 - Confirmar con el contador: IVA por producto, facturas de negocios populares RIMPE y formas de pago del fiado.
 - Envío del RIDE por correo (hoy se comparte por enlace y WhatsApp).
+- Liquidación de compra electrónica del SRI (documento 03) para el acopio: hoy la liquidación es un comprobante interno para imprimir.
+- Recordatorios automáticos por WhatsApp (citas, fiado, membresías por vencer): hoy son botones que abren WhatsApp con el mensaje listo.
 
 Nunca subas firmas electrónicas (`.p12`), contraseñas ni claves: van en Secret Manager.

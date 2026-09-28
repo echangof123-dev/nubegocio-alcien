@@ -292,3 +292,15 @@ p { margin: 0; }
 .ocupacion .celda { width: 100%; min-width: 44px; height: 44px; border-radius: 8px; border: 2px dashed var(--border); background: var(--surface);
   font-size: 12px; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px; }
 .ocupacion .celda.ocupada { border: 0; background: var(--brand); color: var(--on-brand); }
+
+/* Reportes por periodo */
+.rejilla-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.grafico-dias { display: flex; align-items: flex-end; gap: 2px; height: 160px; border-bottom: 1px solid var(--border); }
+.grafico-dias .columna { flex: 1; height: 100%; display: flex; align-items: flex-end; background: transparent; border: 0; padding: 0; min-width: 0; }
+.grafico-dias .barra { display: block; width: 100%; max-width: 32px; margin: 0 auto; background: var(--brand); border-radius: 4px 4px 0 0; }
+.grafico-dias .columna.activa .barra { background: var(--ink); }
+.grafico-ejes { display: flex; gap: 2px; }
+.grafico-ejes span { flex: 1; min-width: 0; font-size: 11px; color: var(--ink-muted); white-space: nowrap; overflow: visible; }
+.ranking { display: flex; flex-direction: column; gap: 4px; }
+.ranking .pista { height: 6px; border-radius: 3px; background: var(--surface-alt); overflow: hidden; }
+.ranking .pista span { display: block; height: 100%; background: var(--brand); border-radius: 3px; }

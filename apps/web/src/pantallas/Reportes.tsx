@@ -14,7 +14,7 @@ interface VentaLista {
 }
 interface Resumen { ventas: number; total: number; ticket_promedio: number; fiado_por_cobrar: number }
 
-export function Reportes({ info, avisar, alSalir, alCambiarNegocio }: {
+export function Reportes({ info, avisar, alSalir, alCambiarNegocio, navegar }: {
   info: InfoNegocio; avisar: (t: string) => void; alSalir: () => void; alCambiarNegocio?: () => void; navegar: (r: string) => void;
 }) {
   const [resumen, setResumen] = useState<Resumen | null>(null);
@@ -43,6 +43,7 @@ export function Reportes({ info, avisar, alSalir, alCambiarNegocio }: {
         <div className="tarjeta" style={{ gap: 2 }}><span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>Te deben</span><span className="monto-grande">{dinero(resumen.fiado_por_cobrar)}</span></div>
       </div>
 
+      {puedeGestionar(info.rol) && <button className="boton secundario" onClick={() => navegar("/estadisticas")}>Ver reportes por periodo</button>}
       <div className="tarjeta" style={{ padding: "12px 16px" }}>
         <h3>Ventas de hoy</h3>
         <div className="tabla-simple">
