@@ -88,6 +88,7 @@ jobs:
           BASE=http://localhost:8080 node e2e/flujo-ropa.mjs
           BASE=http://localhost:8080 node e2e/flujo-servicios.mjs
           BASE=http://localhost:8080 node e2e/flujo-acopio.mjs
+          BASE=http://localhost:8080 node e2e/flujo-treinta.mjs
 
       - name: Imagen de Docker en modo producción
         run: |

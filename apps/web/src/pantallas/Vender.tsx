@@ -1,3 +1,4 @@
+import { VentaLibre } from "../componentes/movimientos";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api, mensajeDe } from "../api";
 import type { Categoria, InfoNegocio, LineaCarrito, Producto } from "../tipos";
@@ -18,6 +19,7 @@ export const totalCarrito = (c: LineaCarrito[]) => redondear(c.reduce((s, l) => 
 
 export function Vender({ info, carrito, setCarrito, navegar, avisar }: Props) {
   const [productos, setProductos] = useState<Producto[] | null>(null);
+  const [libre, setLibre] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoria, setCategoria] = useState<string | null>(null);
   const [texto, setTexto] = useState("");
@@ -125,6 +127,9 @@ export function Vender({ info, carrito, setCarrito, navegar, avisar }: Props) {
         )}
       </form>
 
+      <button className="boton texto pequeno" style={{ alignSelf: "flex-start" }} onClick={() => setLibre(true)}>+ Venta libre (sin productos)</button>
+      {libre && <VentaLibre info={info} alCerrar={() => setLibre(false)} alVender={() => avisar("Venta registrada")} />}
+
       {categorias.length > 1 && (
         <div className="chips" role="group" aria-label="Categorías">
           <button className={`chip${categoria === null ? " activo" : ""}`} aria-pressed={categoria === null} onClick={() => setCategoria(null)}>Todos</button>
@@ -147,6 +152,7 @@ export function Vender({ info, carrito, setCarrito, navegar, avisar }: Props) {
             return (
               <button key={p.id} className={`producto${cant ? " en-carrito" : ""}`} onClick={() => tocar(p)}
                 aria-label={`${p.nombre}, ${p.precio === null ? "sin precio" : dinero(p.precio)}${cant ? `, ${fmtCantidad(cant)} en la venta` : ""}`}>
+                {p.foto_version ? <img className="foto" src={`/api/f/${p.id}?v=${p.foto_version}`} alt="" loading="lazy" /> : null}
                 <span className="cabeza">
                   <span className="nombre">{p.nombre}</span>
                   {cant ? <span className="insignia azul">{fmtCantidad(cant)}</span> : null}

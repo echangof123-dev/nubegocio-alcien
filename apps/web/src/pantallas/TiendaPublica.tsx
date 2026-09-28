@@ -5,7 +5,7 @@ import { Aviso, Cargando, Dialogo } from "../componentes/basicos";
 import { IMas, IMenos } from "../componentes/iconos";
 
 interface Variante { id: string; variante: string; precio: number; agotado: boolean }
-interface ProductoPub { id: string; nombre: string; precio: number; unidad: string; categoria_id: string | null; agotado: boolean; variantes: Variante[] | null }
+interface ProductoPub { id: string; foto_version?: number | null; nombre: string; precio: number; unidad: string; categoria_id: string | null; agotado: boolean; variantes: Variante[] | null }
 interface Catalogo {
   negocio: string; tipo: string; mensaje: string | null; whatsapp: string | null; acepta_pedidos: boolean; costo_envio: number | null;
   categorias: { id: string; nombre: string }[]; productos: ProductoPub[];
@@ -78,6 +78,7 @@ export function TiendaPublica({ slug }: { slug: string }) {
             return (
               <button key={p.id} className={`producto${cant ? " en-carrito" : ""}`} disabled={p.agotado && !p.variantes}
                 onClick={() => (p.variantes ? setVariantes(p) : agregar(p.id, p.nombre, p.precio))}>
+                {p.foto_version ? <img className="foto" src={`/api/f/${p.id}?v=${p.foto_version}`} alt="" loading="lazy" /> : null}
                 <span className="cabeza"><span className="nombre">{p.nombre}</span>{cant ? <span className="insignia azul">{cant}</span> : null}</span>
                 <span className="unidad">{p.variantes ? `${p.variantes.length} opciones` : p.agotado ? "Agotado" : p.unidad}</span>
                 <span className="precio">{dinero(p.precio)}</span>

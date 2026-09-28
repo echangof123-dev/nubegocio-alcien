@@ -100,7 +100,7 @@ test("protección de peticiones", async () => {
   const r = await fetch(env.url + "/api/auth/codigo", { method: "POST", headers: { "content-type": "text/plain" }, body: "celular=0991234505" });
   assert.equal(r.status, 415, "solo JSON");
 
-  const grande = await c.post("/auth/codigo", { celular: "x".repeat(200_000) });
+  const grande = await c.post("/auth/codigo", { celular: "x".repeat(2_000_000) });
   assert.equal(grande.status, 413);
 
   const token = await c.pedir("GET", "/yo", undefined, { authorization: "Bearer inventado-inventado-inventado" });

@@ -68,7 +68,8 @@ export function rutasNegocio(r: Router, dep: { pool: Pool; ia: GeneradorPlantill
     const { rows: n } = await db.query(
       `select n.id, n.nombre, n.familia, f.nombre as familia_nombre, t.nombre as tipo, n.ruc, n.razon_social, n.regimen,
               s.plan, s.estado as suscripcion, s.vence_en, app.plan_vigente(n.id) as plan_vigente,
-              c.palabra_items, c.unidad_defecto, c.iva_defecto, c.metodos_pago, c.permite_vender_sin_stock, c.exige_caja_abierta
+              c.palabra_items, c.unidad_defecto, c.iva_defecto, c.metodos_pago, c.permite_vender_sin_stock, c.exige_caja_abierta,
+              c.direccion, c.telefono, c.mensaje_recibo
        from app.negocio n
        join catalogo.familia f on f.codigo = n.familia
        join catalogo.tipo_negocio t on t.id = n.tipo_negocio_id
@@ -146,6 +147,12 @@ export function rutasNegocio(r: Router, dep: { pool: Pool; ia: GeneradorPlantill
     for (const campo of ["permite_vender_sin_stock", "exige_caja_abierta"] as const) {
       if (c[campo] !== undefined) {
         valores.push(booleano(c[campo], campo));
+        cambios.push(`${campo} = $${valores.length}`);
+      }
+    }
+    for (const [campo, max] of [["direccion", 300], ["telefono", 30], ["mensaje_recibo", 200]] as const) {
+      if (c[campo] !== undefined) {
+        valores.push(textoOpcional(c[campo], campo, { max }));
         cambios.push(`${campo} = $${valores.length}`);
       }
     }

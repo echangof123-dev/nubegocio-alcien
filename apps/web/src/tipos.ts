@@ -29,6 +29,9 @@ export interface Negocio {
   metodos_pago: string[];
   permite_vender_sin_stock: boolean;
   exige_caja_abierta: boolean;
+  direccion?: string | null;
+  telefono?: string | null;
+  mensaje_recibo?: string | null;
 }
 
 export interface InfoNegocio { negocio: Negocio; rol: Rol; modulos: Modulo[] }
@@ -56,6 +59,7 @@ export interface Producto {
   garantia_meses?: number | null;
   duracion_min?: number | null;
   comision_pct?: number | null;
+  foto_version?: number | null;
   hijos?: number;
   stock_variantes?: number;
 }

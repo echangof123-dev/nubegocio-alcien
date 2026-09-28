@@ -1,10 +1,12 @@
+import { enlaceWa } from "../componentes/servicios";
+import { mensajeCobro } from "./Clientes";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, mensajeDe } from "../api";
 import type { Cliente } from "../tipos";
 import { dinero, parsearNumero } from "../formato";
 import { Aviso, CampoMonto, Cargando, Dialogo } from "../componentes/basicos";
 
-export function Fiados({ avisar }: { avisar: (t: string) => void }) {
+export function Fiados({ avisar, negocio }: { avisar: (t: string) => void; negocio: string }) {
   const [clientes, setClientes] = useState<Cliente[] | null>(null);
   const [abonar, setAbonar] = useState<Cliente | null>(null);
 
@@ -39,6 +41,7 @@ export function Fiados({ avisar }: { avisar: (t: string) => void }) {
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <strong>{dinero(c.saldo)}</strong>
+                  {(() => { const wa = enlaceWa(c.celular, mensajeCobro(c, negocio)); return wa ? <a className="boton pequeno secundario" href={wa} target="_blank" rel="noopener">Recordar</a> : null; })()}
                   <button className="boton pequeno secundario" onClick={() => setAbonar(c)}>Abonar</button>
                 </span>
               </div>

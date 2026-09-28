@@ -6,6 +6,12 @@ import {
   lista, numero, numeroOpcional, objeto, opcion, texto, textoOpcional, uuid, uuidOpcional,
 } from "../http/validar.js";
 
+function fechaOpcional(v: unknown): string | null {
+  if (v === undefined || v === null || v === "") return null;
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw invalido("La fecha de pago debe ser AAAA-MM-DD");
+  return v;
+}
+
 const METODOS = ["efectivo", "transferencia", "tarjeta", "deuna", "fiado"] as const;
 
 export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
@@ -57,14 +63,15 @@ export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
       alConfirmar(() => dep.sri.enviar(firmados));
       factura = f[0];
     }
-    return { status: 201, cuerpo: { venta: rows[0], factura } };
+    const { rows: t } = await db.query<{ token_publico: string }>("select token_publico from app.venta where id = $1", [rows[0]!.venta_id]);
+    return { status: 201, cuerpo: { venta: { ...rows[0], token: t[0]!.token_publico }, factura } };
   });
 
   r.negocio("GET", "/ventas", async (p, { db }) => {
     const fecha = p.query.get("fecha");
     if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) throw invalido("La fecha debe ser AAAA-MM-DD");
     const { rows } = await db.query(
-      `select v.id, v.numero, v.estado, v.total, v.comprobante, v.creado_en, c.nombre as cliente,
+      `select v.id, v.numero, v.estado, v.total, v.comprobante, v.creado_en, c.nombre as cliente, v.token_publico as token,
               (select string_agg(distinct metodo, ', ') from app.pago where venta_id = v.id) as metodos,
               (select jsonb_build_object('id', f.id, 'numero', f.numero, 'estado', f.estado,
                                          'consumidor_final', f.comprador->>'tipo_identificacion' = '07')
@@ -156,12 +163,15 @@ export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
 
   r.negocio("POST", "/gastos", async (p, { db }) => {
     const c = objeto(p.cuerpo);
-    const { rows } = await db.query<{ id: string }>("select app.registrar_gasto($1, $2, $3, $4) as id", [
-      texto(c.categoria, "La categoría", { max: 60 }),
-      numero(c.monto, "El monto", { min: 0.01, max: 1_000_000, decimales: 2 }),
-      opcion(c.metodo, "El método", ["efectivo", "transferencia", "tarjeta", "otro"] as const),
-      textoOpcional(c.descripcion, "La descripción", { max: 200 }),
-    ]);
+    const fecha = textoOpcional(c.fecha, "La fecha", { max: 10 });
+    if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) throw invalido("La fecha debe ser AAAA-MM-DD");
+    const { rows } = await db.query<{ id: string }>("select app.registrar_gasto_v2($1::jsonb) as id", [{
+      categoria: texto(c.categoria, "La categoría", { max: 60 }),
+      monto: numero(c.monto, "El monto", { min: 0.01, max: 1_000_000, decimales: 2 }),
+      metodo: c.metodo === undefined ? "efectivo" : opcion(c.metodo, "El método", ["efectivo", "transferencia", "tarjeta", "otro"] as const),
+      descripcion: textoOpcional(c.descripcion, "La descripción", { max: 200 }),
+      fecha, proveedor_id: uuidOpcional(c.proveedor_id, "El proveedor"),
+    }]);
     return { status: 201, cuerpo: { id: rows[0]!.id } };
   });
 
@@ -172,7 +182,9 @@ export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
     const conDeuda = p.query.get("con_deuda") === "1";
     const { rows } = await db.query(
       `select s.cliente_id as id, s.nombre, s.celular, s.limite_credito, s.saldo, s.ultimo_cargo,
-              c.identificacion, c.tipo_identificacion, c.correo, c.direccion, c.lista_precio_id
+              c.identificacion, c.tipo_identificacion, c.correo, c.direccion, c.lista_precio_id, c.notas, c.fecha_pago,
+              (select coalesce(sum(v.total), 0) from app.venta v where v.cliente_id = c.id and v.estado <> 'anulada') as comprado,
+              (select max(v.creado_en) from app.venta v where v.cliente_id = c.id and v.estado <> 'anulada') as ultima_compra
        from app.cliente_saldo s join app.cliente c on c.id = s.cliente_id
        where c.activo
          and ($1 = '' or catalogo.normalizar(s.nombre) like '%' || catalogo.normalizar($1) || '%'
@@ -221,15 +233,21 @@ export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
          tipo_identificacion = coalesce($5, tipo_identificacion),
          identificacion = coalesce($6, identificacion),
          direccion = coalesce($7, direccion),
-         lista_precio_id = case when $8 then $9::uuid else lista_precio_id end
+         lista_precio_id = case when $8 then $9::uuid else lista_precio_id end,
+         notas = case when $10 then $11 else notas end,
+         fecha_pago = case when $12 then $13::date else fecha_pago end,
+         limite_credito = case when $14 then $15::numeric else limite_credito end
        where id = $1
-       returning id, nombre, celular, limite_credito, identificacion, tipo_identificacion, correo, direccion, lista_precio_id`, [
+       returning id, nombre, celular, limite_credito, identificacion, tipo_identificacion, correo, direccion, lista_precio_id, notas, fecha_pago`, [
         id,
         textoOpcional(c.nombre, "El nombre", { max: 120 }),
         textoOpcional(c.celular, "El celular", { max: 20 }),
         correo, tipo, identificacion,
         textoOpcional(c.direccion, "La dirección", { max: 300 }),
         c.lista_precio_id !== undefined, uuidOpcional(c.lista_precio_id, "La lista de precios"),
+        c.notas !== undefined, textoOpcional(c.notas, "Las notas", { max: 500 }),
+        c.fecha_pago !== undefined, fechaOpcional(c.fecha_pago),
+        c.limite_credito !== undefined, numeroOpcional(c.limite_credito, "El límite de crédito", { min: 0, max: 1_000_000, decimales: 2 }),
       ]);
     if (!rows[0]) throw noEncontrado("Cliente no encontrado");
     return { cliente: rows[0] };

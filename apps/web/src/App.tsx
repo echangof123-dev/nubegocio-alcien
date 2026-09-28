@@ -32,6 +32,11 @@ import { Reservas } from "./pantallas/Reservas";
 import { Membresias } from "./pantallas/Membresias";
 import { Acopio } from "./pantallas/Acopio";
 import { Estadisticas } from "./pantallas/Estadisticas";
+import { Balance } from "./pantallas/Balance";
+import { Gastos } from "./pantallas/Gastos";
+import { Clientes } from "./pantallas/Clientes";
+import { Inventario } from "./pantallas/Inventario";
+import { Ajustes } from "./pantallas/Ajustes";
 import { PANTALLAS, titulo } from "./modulos";
 
 function useRuta(): [string, (r: string) => void] {
@@ -55,7 +60,7 @@ function menu(info: InfoNegocio) {
     { ruta: "/", nombre: "Vender", Icono: ITienda },
     { ruta: "/productos", nombre: titulo(info.negocio.palabra_items || "productos"), Icono: IProductos },
     { ruta: "/caja", nombre: "Caja", Icono: ICaja },
-    { ruta: "/reportes", nombre: "Reportes", Icono: IReportes },
+    { ruta: "/balance", nombre: "Balance", Icono: IReportes },
     { ruta: "/mas", nombre: "Más", Icono: IMenu },
   ];
 }
@@ -130,7 +135,7 @@ export function App() {
   if (sesion.negocios.length === 0 || ruta === "/nuevo-negocio") {
     return (
       <Registro
-        alVolver={sesion.negocios.length > 0 ? () => navegar("/reportes") : undefined}
+        alVolver={sesion.negocios.length > 0 ? () => navegar("/ajustes") : undefined}
         alCrear={async (id) => {
           const s = await api<Sesion>("GET", "/yo");
           setSesion(s);
@@ -144,12 +149,19 @@ export function App() {
   if (!info) return <Cargando />;
 
   const conNav = ruta !== "/cobrar";
+  const cambiarNegocio = sesion.negocios.length > 1 ? () => {
+    const i = sesion.negocios.findIndex((n) => n.negocio_id === negocioId);
+    const siguiente = sesion.negocios[(i + 1) % sesion.negocios.length]!;
+    setCarritoEstado([]);
+    elegir(sesion.negocios, siguiente.negocio_id);
+    navegar("/");
+  } : undefined;
   let pantalla;
   switch (ruta) {
     case "/cobrar": pantalla = <Cobrar info={info} carrito={carrito} setCarrito={setCarrito} navegar={navegar} />; break;
     case "/caja": pantalla = <Caja info={info} avisar={avisar} />; break;
     case "/productos": pantalla = <Productos info={info} avisar={avisar} />; break;
-    case "/fiados": pantalla = <Fiados avisar={avisar} />; break;
+    case "/fiados": pantalla = <Fiados avisar={avisar} negocio={info.negocio.nombre} />; break;
     case "/facturacion": pantalla = <Facturacion info={info} avisar={avisar} navegar={navegar} />; break;
     case "/mas": pantalla = <Mas info={info} navegar={navegar} />; break;
     case "/modulos": pantalla = <Modulos info={info} avisar={avisar} navegar={navegar} alCambiar={recargarInfo} />; break;
@@ -171,15 +183,16 @@ export function App() {
     case "/membresias": pantalla = <Membresias info={info} avisar={avisar} />; break;
     case "/acopio": pantalla = <Acopio info={info} avisar={avisar} />; break;
     case "/estadisticas": pantalla = <Estadisticas info={info} avisar={avisar} />; break;
+    case "/balance": pantalla = <Balance info={info} avisar={avisar} navegar={navegar} />; break;
+    case "/gastos": pantalla = <Gastos info={info} avisar={avisar} />; break;
+    case "/clientes": pantalla = <Clientes info={info} avisar={avisar} />; break;
+    case "/inventario": pantalla = <Inventario info={info} avisar={avisar} />; break;
+    case "/ajustes":
+      pantalla = <Ajustes info={info} avisar={avisar} alCambiar={recargarInfo} alSalir={salir} navegar={navegar} alCambiarNegocio={cambiarNegocio} />;
+      break;
     case "/reportes":
       pantalla = <Reportes info={info} avisar={avisar} alSalir={salir} navegar={navegar}
-        alCambiarNegocio={sesion.negocios.length > 1 ? () => {
-          const i = sesion.negocios.findIndex((n) => n.negocio_id === negocioId);
-          const siguiente = sesion.negocios[(i + 1) % sesion.negocios.length]!;
-          setCarritoEstado([]);
-          elegir(sesion.negocios, siguiente.negocio_id);
-          navegar("/");
-        } : undefined} />;
+        alCambiarNegocio={cambiarNegocio} />;
       break;
     default:
       if (ruta.startsWith("/cuenta/")) { pantalla = <Cuenta key={ruta} id={ruta.slice(8)} info={info} navegar={navegar} avisar={avisar} />; break; }

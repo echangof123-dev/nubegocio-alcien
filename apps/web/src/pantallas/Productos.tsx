@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { FotoProducto } from "../componentes/foto";
+import { HistorialProducto } from "./Inventario";
 import { api, mensajeDe } from "../api";
 import type { Categoria, InfoNegocio, Producto } from "../tipos";
 import { puedeGestionar, tieneModulo } from "../tipos";
@@ -78,6 +80,9 @@ function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, al
   const [duracion, setDuracion] = useState(producto?.duracion_min ? String(producto.duracion_min) : "");
   const [comision, setComision] = useState(producto?.comision_pct != null ? String(producto.comision_pct).replace(".", ",") : "");
   const [garantia, setGarantia] = useState(producto?.garantia_meses ? String(producto.garantia_meses) : "");
+  const [foto, setFoto] = useState(producto?.foto_version ?? null);
+  const [historial, setHistorial] = useState(false);
+  const cambioFoto = useRef(false);
   const [variantes, setVariantes] = useState(false);
   const esModelo = (producto?.hijos ?? 0) > 0;
   const [nombre, setNombre] = useState(producto?.nombre ?? "");
@@ -120,7 +125,8 @@ function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, al
   }
 
   return (
-    <Dialogo titulo={producto ? "Editar producto" : "Nuevo producto"} alCerrar={alCerrar}>
+    <Dialogo titulo={producto ? "Editar producto" : "Nuevo producto"} alCerrar={() => (cambioFoto.current ? alGuardar() : alCerrar())}>
+      {historial && producto && <HistorialProducto producto={producto} alCerrar={() => setHistorial(false)} />}
       <form onSubmit={guardar} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div className="campo">
           <label htmlFor="p-nombre">Nombre</label>
@@ -154,6 +160,10 @@ function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, al
             <input id="p-codigo" className="entrada" inputMode="numeric" maxLength={32} value={codigo} onChange={(e) => setCodigo(e.target.value)} />
           </div>
         </div>
+        {producto && rol !== "cajero" && <FotoProducto id={producto.id} version={foto} alCambiar={(v) => { setFoto(v); cambioFoto.current = true; }} />}
+        {producto && producto.maneja_stock && !esModelo && (
+          <button type="button" className="boton texto pequeno" style={{ alignSelf: "flex-start" }} onClick={() => setHistorial(true)}>Ver entradas y salidas</button>
+        )}
         {conServicio && producto && (
           <div className="opciones">
             <div className="campo">

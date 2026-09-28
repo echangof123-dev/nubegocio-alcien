@@ -91,8 +91,9 @@ try {
   await liq.close();
 
   // Reportes por periodo
-  await pagina.getByRole("link", { name: "Reportes" }).click();
-  await pagina.getByRole("button", { name: "Ver reportes por periodo" }).click();
+  await pagina.getByRole("link", { name: "Balance" }).click();
+  await esperarTexto("Egresos");
+  await pagina.getByRole("button", { name: "Reportes por periodo" }).click();
   await esperarTexto("Utilidad bruta");
   await esperarTexto("Saco de yute");
   await esperarTexto("$ 1.115,52");   // compras del periodo

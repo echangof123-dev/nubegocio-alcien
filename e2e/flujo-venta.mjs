@@ -99,8 +99,10 @@ try {
   await pagina.getByRole("button", { name: "Cerrar caja" }).click();
   await esperarTexto("Vendiste $ 4,85");
 
-  // 7. Reportes del día
-  await pagina.getByRole("link", { name: "Reportes" }).click();
+  // 7. Balance y ventas del día
+  await pagina.getByRole("link", { name: "Balance" }).click();
+  await esperarTexto("Ingresos");
+  await pagina.getByRole("button", { name: "Ventas del día y anulaciones" }).click();
   await esperarTexto("Ventas de hoy");
   await foto("reportes");
 

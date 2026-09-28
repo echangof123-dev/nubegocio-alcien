@@ -10,6 +10,11 @@ export interface PantallaModulo {
 }
 
 export const PANTALLAS: PantallaModulo[] = [
+  // "*": pantallas de todos los negocios (como en Treinta)
+  { modulo: "*", ruta: "/clientes", nombre: "Clientes", descripcion: "Historial, notas y quién te debe" },
+  { modulo: "*", ruta: "/gastos", nombre: "Gastos", descripcion: "Arriendo, servicios, nómina y más" },
+  { modulo: "M04", ruta: "/inventario", nombre: "Inventario", descripcion: "Valor, stock bajo y carga desde Excel" },
+  { modulo: "*", ruta: "/reportes", nombre: "Ventas del día", descripcion: "Ventas, facturas y anulaciones" },
   { modulo: "M09", ruta: "/mesas", nombre: "Mesas", descripcion: "Cuentas abiertas, comandas y cobro por mesa" },
   { modulo: "M10", ruta: "/pedidos", nombre: "Pedidos", descripcion: "Para llevar y a domicilio" },
   { modulo: "M09|M10", ruta: "/cocina", nombre: "Cocina", descripcion: "Lo que hay que preparar" },
@@ -30,6 +35,7 @@ export const PANTALLAS: PantallaModulo[] = [
   { modulo: "M24", ruta: "/cotizaciones", nombre: "Cotizaciones", descripcion: "Proformas que se vuelven venta" },
   { modulo: "M19", ruta: "/facturacion", nombre: "Facturación", descripcion: "SRI, firma y comprobantes" },
   { modulo: "M20", ruta: "/equipo", nombre: "Equipo", descripcion: "Cajeros, bodegueros y administradores" },
+  { modulo: "*", ruta: "/ajustes", nombre: "Ajustes", descripcion: "Recibo, impresora, pagos y tu cuenta" },
 ];
 
 /** Módulos que funcionan dentro de otras pantallas (no tienen una propia). */
@@ -42,7 +48,7 @@ export const tienePantalla = (modulo: string) => PANTALLAS.some((p) => p.modulo.
 
 /** Una pantalla con "M09|M10" aparece si el negocio tiene cualquiera de los dos. */
 export function pantallasActivas(info: InfoNegocio): PantallaModulo[] {
-  return PANTALLAS.filter((p) => p.modulo.split("|").some((m) => tieneModulo(info, m)));
+  return PANTALLAS.filter((p) => p.modulo === "*" || p.modulo.split("|").some((m) => tieneModulo(info, m)));
 }
 
 /** "productos" → "Productos"; "platos" → "Platos" */

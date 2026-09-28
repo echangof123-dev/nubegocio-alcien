@@ -1,3 +1,4 @@
+import { AccionesRecibo } from "../componentes/recibo";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, mensajeDe } from "../api";
 import type { Cliente, EstadoSri as TEstadoSri, InfoNegocio, LineaCarrito } from "../tipos";
@@ -21,7 +22,7 @@ type Props = {
 const NOMBRES: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta", deuna: "DeUna", fiado: "Fiado" };
 
 interface Hecha {
-  venta_id: string; numero: number; total: number; vuelto: number; metodo: string; cliente?: Cliente | null;
+  venta_id: string; numero: number; total: number; vuelto: number; token: string; metodo: string; cliente?: Cliente | null;
   factura?: { id: string; numero: string } | null;
   conGarantia: LineaCarrito[];
 }
@@ -89,7 +90,7 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
       const pago: Record<string, unknown> = { metodo, monto: total };
       if (metodo === "efectivo") pago.recibido = recibidoN ?? total;
       if (referencia.trim() && metodo !== "efectivo" && metodo !== "fiado") pago.referencia = referencia.trim();
-      const r = await api<{ venta: { venta_id: string; numero: number; total: number; vuelto: number }; factura: { id: string; numero: string } | null }>("POST", "/ventas", {
+      const r = await api<{ venta: { venta_id: string; numero: number; total: number; vuelto: number; token: string }; factura: { id: string; numero: string } | null }>("POST", "/ventas", {
         items: carrito.map((l) => ({ producto_id: l.producto.id, cantidad: l.cantidad })),
         pagos: [pago],
         cliente_id: cliente?.id,
@@ -118,6 +119,7 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
         )}
         {hecha.metodo === "fiado" && <Aviso tipo="info">Quedó anotado en los fiados de {hecha.cliente?.nombre}.</Aviso>}
         {hecha.factura && <FacturaHecha id={hecha.factura.id} negocio={info.negocio.nombre} celular={hecha.cliente?.celular} />}
+        <AccionesRecibo token={hecha.token} negocio={info.negocio.nombre} total={Number(hecha.total)} celular={hecha.cliente?.celular} />
         {hecha.conGarantia.length > 0 && (
           <button className="boton secundario bloque" onClick={() => setSeries(true)}>Anotar series (garantía)</button>
         )}

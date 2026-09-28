@@ -1,3 +1,4 @@
+import { imprimirRecibo, whatsappRecibo } from "../componentes/recibo";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, mensajeDe } from "../api";
 import type { InfoNegocio } from "../tipos";
@@ -9,7 +10,7 @@ import { Aviso, Cargando, Dialogo } from "../componentes/basicos";
 import { ISalir } from "../componentes/iconos";
 
 interface VentaLista {
-  id: string; numero: number; estado: string; total: number; creado_en: string; cliente: string | null; metodos: string | null;
+  id: string; numero: number; estado: string; total: number; creado_en: string; cliente: string | null; metodos: string | null; token: string;
   factura: { id: string; numero: string; estado: EstadoComprobante; consumidor_final: boolean } | null;
 }
 interface Resumen { ventas: number; total: number; ticket_promedio: number; fiado_por_cobrar: number }
@@ -35,7 +36,7 @@ export function Reportes({ info, avisar, alSalir, alCambiarNegocio, navegar }: {
 
   return (
     <div className="contenido" style={{ maxWidth: 720, width: "100%", margin: "0 auto" }}>
-      <h1>Hoy</h1>
+      <h1>Ventas del día</h1>
       <div className="opciones" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
         <div className="tarjeta" style={{ gap: 2 }}><span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>Vendiste</span><span className="monto-grande">{dinero(resumen.total)}</span></div>
         <div className="tarjeta" style={{ gap: 2 }}><span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>Ventas</span><span className="monto-grande">{resumen.ventas}</span></div>
@@ -53,6 +54,12 @@ export function Reportes({ info, avisar, alSalir, alCambiarNegocio, navegar }: {
                 <span className={v.estado === "anulada" ? "anulada" : ""}><strong>N.º {v.numero}</strong> · {hora(v.creado_en)}</span>
                 <span className="muted" style={{ fontSize: 13 }}>{v.estado === "anulada" ? "Anulada" : `${v.metodos ?? ""}${v.cliente ? ` · ${v.cliente}` : ""}`}</span>
                 {v.factura && <span style={{ fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}>Factura {v.factura.numero} <EstadoSri estado={v.factura.estado} /></span>}
+                {v.estado !== "anulada" && (
+                  <span className="acciones-mini">
+                    <a href={whatsappRecibo(v.token, info.negocio.nombre, Number(v.total))} target="_blank" rel="noopener">Enviar recibo</a>
+                    <button type="button" onClick={() => imprimirRecibo(v.token)}>Imprimir</button>
+                  </span>
+                )}
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <strong className={v.estado === "anulada" ? "anulada" : ""}>{dinero(v.total)}</strong>
