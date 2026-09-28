@@ -25,6 +25,11 @@ import { Recetas } from "./pantallas/Recetas";
 import { Listas } from "./pantallas/Listas";
 import { Series } from "./pantallas/Series";
 import { CatalogoConfig } from "./pantallas/CatalogoConfig";
+import { Agenda } from "./pantallas/Agenda";
+import { Profesionales } from "./pantallas/Profesionales";
+import { Ordenes } from "./pantallas/Ordenes";
+import { Reservas } from "./pantallas/Reservas";
+import { Membresias } from "./pantallas/Membresias";
 import { PANTALLAS, titulo } from "./modulos";
 
 function useRuta(): [string, (r: string) => void] {
@@ -157,6 +162,11 @@ export function App() {
     case "/listas": pantalla = <Listas info={info} avisar={avisar} />; break;
     case "/series": pantalla = <Series info={info} avisar={avisar} />; break;
     case "/catalogo": pantalla = <CatalogoConfig info={info} avisar={avisar} />; break;
+    case "/agenda": pantalla = <Agenda info={info} avisar={avisar} />; break;
+    case "/profesionales": pantalla = <Profesionales info={info} avisar={avisar} />; break;
+    case "/ordenes": pantalla = <Ordenes info={info} avisar={avisar} />; break;
+    case "/reservas": pantalla = <Reservas info={info} avisar={avisar} />; break;
+    case "/membresias": pantalla = <Membresias info={info} avisar={avisar} />; break;
     case "/reportes":
       pantalla = <Reportes info={info} avisar={avisar} alSalir={salir} navegar={navegar}
         alCambiarNegocio={sesion.negocios.length > 1 ? () => {

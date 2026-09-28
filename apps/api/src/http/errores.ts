@@ -33,6 +33,7 @@ export function traducirError(e: unknown): { status: number; cuerpo: { error: st
       case "22023": return { status: 422, cuerpo: { error: e.message, codigo: "datos_invalidos" } };
       case "55000": return { status: 409, cuerpo: { error: e.message, codigo: "estado" } };
       case "23505": return { status: 409, cuerpo: { error: e.message, codigo: "duplicado" } };
+      case "23P01": return { status: 409, cuerpo: { error: e.message, codigo: "ocupado" } };
       case "22P02": case "22003": case "22007": case "22008":
         return { status: 422, cuerpo: { error: "Formato de dato inválido", codigo: "datos_invalidos" } };
     }

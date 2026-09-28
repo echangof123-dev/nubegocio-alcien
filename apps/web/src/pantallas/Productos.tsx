@@ -64,17 +64,19 @@ export function Productos({ info, avisar }: { info: InfoNegocio; avisar: (t: str
       </div>
       {editar && (
         <EditarProducto producto={editar === "nuevo" ? null : editar} categorias={categorias} rol={info.rol} unidadDefecto={info.negocio.unidad_defecto}
-          conVariantes={tieneModulo(info, "M05")} conGarantia={tieneModulo(info, "M23")}
+          conVariantes={tieneModulo(info, "M05")} conGarantia={tieneModulo(info, "M23")} conServicio={tieneModulo(info, "M11") || tieneModulo(info, "M12")}
           alCerrar={() => setEditar(null)} alGuardar={() => { setEditar(null); avisar("Guardado"); cargar(); }} />
       )}
     </div>
   );
 }
 
-function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, alGuardar, conVariantes, conGarantia }: {
+function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, alGuardar, conVariantes, conGarantia, conServicio = false }: {
   producto: Producto | null; categorias: Categoria[]; rol: InfoNegocio["rol"]; unidadDefecto: string; alCerrar: () => void; alGuardar: () => void;
-  conVariantes: boolean; conGarantia: boolean;
+  conVariantes: boolean; conGarantia: boolean; conServicio?: boolean;
 }) {
+  const [duracion, setDuracion] = useState(producto?.duracion_min ? String(producto.duracion_min) : "");
+  const [comision, setComision] = useState(producto?.comision_pct != null ? String(producto.comision_pct).replace(".", ",") : "");
   const [garantia, setGarantia] = useState(producto?.garantia_meses ? String(producto.garantia_meses) : "");
   const [variantes, setVariantes] = useState(false);
   const esModelo = (producto?.hijos ?? 0) > 0;
@@ -99,6 +101,10 @@ function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, al
       };
       if (ponePrecio) datos.precio = parsearNumero(precio);
       if (conGarantia && producto) datos.garantia_meses = garantia ? Number(garantia) : null;
+      if (conServicio && producto) {
+        datos.duracion_min = duracion ? Number(duracion) : null;
+        if (ponePrecio) datos.comision_pct = parsearNumero(comision);
+      }
       if (producto) {
         await api("PATCH", `/productos/${producto.id}`, datos);
         const s = parsearNumero(stock);
@@ -148,6 +154,20 @@ function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, al
             <input id="p-codigo" className="entrada" inputMode="numeric" maxLength={32} value={codigo} onChange={(e) => setCodigo(e.target.value)} />
           </div>
         </div>
+        {conServicio && producto && (
+          <div className="opciones">
+            <div className="campo">
+              <label htmlFor="p-duracion">Duración en minutos</label>
+              <input id="p-duracion" className="entrada" inputMode="numeric" maxLength={4} placeholder="30" value={duracion} onChange={(e) => setDuracion(e.target.value.replace(/\D/g, ""))} />
+            </div>
+            {ponePrecio && (
+              <div className="campo">
+                <label htmlFor="p-comision">Comisión % (si no, la del profesional)</label>
+                <input id="p-comision" className="entrada" inputMode="decimal" maxLength={6} value={comision} onChange={(e) => setComision(e.target.value)} />
+              </div>
+            )}
+          </div>
+        )}
         {conGarantia && producto && (
           <div className="campo">
             <label htmlFor="p-garantia">Garantía en meses (para anotar series al vender)</label>

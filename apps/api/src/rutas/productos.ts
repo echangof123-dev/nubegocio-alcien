@@ -5,7 +5,7 @@ import { booleano, numero, numeroOpcional, objeto, texto, textoOpcional, uuid, u
 const COLUMNAS = `p.id, p.nombre, p.categoria_id, c.nombre as categoria, p.unidad, p.precio, p.costo, p.iva,
   p.codigo_barras, p.maneja_stock, p.stock, p.stock_minimo, p.variantes, p.es_ejemplo, p.activo, p.tipo,
   exists (select 1 from app.receta r where r.producto_id = p.id) as tiene_receta,
-  p.padre_id, p.variante, p.garantia_meses,
+  p.padre_id, p.variante, p.garantia_meses, p.duracion_min, p.comision_pct,
   (select count(*)::int from app.producto h where h.padre_id = p.id and h.activo) as hijos,
   (select coalesce(sum(h.stock), 0) from app.producto h where h.padre_id = p.id and h.activo) as stock_variantes`;
 
@@ -104,6 +104,11 @@ export function rutasProductos(r: Router) {
     if (c.stock_minimo !== undefined) campos.push(["stock_minimo", numeroOpcional(c.stock_minimo, "El stock mínimo", { min: 0, decimales: 3 })]);
     if (c.activo !== undefined) campos.push(["activo", booleano(c.activo, "Activo")]);
     if (c.tipo !== undefined) campos.push(["tipo", c.tipo === "insumo" ? "insumo" : "venta"]);
+    if (c.duracion_min !== undefined) campos.push(["duracion_min", numeroOpcional(c.duracion_min, "La duración", { min: 5, max: 1440, decimales: 0 })]);
+    if (c.comision_pct !== undefined) {
+      if (rol === "bodeguero") throw prohibido();
+      campos.push(["comision_pct", numeroOpcional(c.comision_pct, "La comisión", { min: 0, max: 100, decimales: 2 })]);
+    }
     if (c.garantia_meses !== undefined) campos.push(["garantia_meses", numeroOpcional(c.garantia_meses, "Los meses de garantía", { min: 0, max: 120, decimales: 0 })]);
 
     if (campos.length) {

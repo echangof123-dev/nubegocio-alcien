@@ -44,3 +44,7 @@ export const IReceta = (p: P) => <Icono {...p}><path d="M6 3h12v18H6z" /><path d
 export const IEtiqueta = (p: P) => <Icono {...p}><path d="M3 12V4h8l10 10-8 8z" /><circle cx="7.5" cy="8.5" r="1.5" /></Icono>;
 export const IEscudo = (p: P) => <Icono {...p}><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /><path d="M9 12l2 2 4-4" /></Icono>;
 export const IGlobo = (p: P) => <Icono {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18" /></Icono>;
+export const ICalendario = (p: P) => <Icono {...p}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4M8 14h3" /></Icono>;
+export const ILlave = (p: P) => <Icono {...p}><path d="M14.5 5.5a4.5 4.5 0 0 0 5.6 5.6L12 19.2a2 2 0 0 1-2.8 0l-.4-.4a2 2 0 0 1 0-2.8l8.1-8.1" /><path d="M14.5 5.5L17 3l4 4-2.5 2.5" /></Icono>;
+export const ICama = (p: P) => <Icono {...p}><path d="M3 18V6M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5" /><circle cx="7" cy="11" r="2" /></Icono>;
+export const ICarnet = (p: P) => <Icono {...p}><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="11" r="2.2" /><path d="M5.5 16c.6-1.6 1.9-2.4 3.5-2.4s2.9.8 3.5 2.4M14 10h4M14 13h3" /></Icono>;

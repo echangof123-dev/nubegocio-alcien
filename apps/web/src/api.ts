@@ -24,7 +24,7 @@ export function usarNegocio(id: string | null): void {
   } catch { /* modo privado: solo en memoria */ }
 }
 
-export async function api<T>(metodo: "GET" | "POST" | "PATCH", ruta: string, cuerpo?: unknown): Promise<T> {
+export async function api<T>(metodo: "GET" | "POST" | "PATCH" | "DELETE", ruta: string, cuerpo?: unknown): Promise<T> {
   const headers: Record<string, string> = {};
   if (cuerpo !== undefined) headers["content-type"] = "application/json";
   if (negocioActual) headers["x-negocio"] = negocioActual;

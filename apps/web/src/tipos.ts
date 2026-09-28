@@ -54,6 +54,8 @@ export interface Producto {
   padre_id?: string | null;
   variante?: string | null;
   garantia_meses?: number | null;
+  duracion_min?: number | null;
+  comision_pct?: number | null;
   hijos?: number;
   stock_variantes?: number;
 }

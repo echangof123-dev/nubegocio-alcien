@@ -284,3 +284,11 @@ p { margin: 0; }
 .tienda { max-width: 1100px; margin: 0 auto; min-height: 100vh; background: var(--surface-alt); }
 .tienda-cabecera { padding: 24px 16px 8px; display: flex; flex-direction: column; gap: 4px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .tienda .barra-cobro { bottom: 16px; }
+
+/* Reservas: ocupación de la semana */
+.ocupacion { border-collapse: separate; border-spacing: 4px; min-width: 100%; }
+.ocupacion th { font-size: 12px; font-weight: 700; color: var(--ink-muted); text-transform: capitalize; white-space: nowrap; padding: 0 4px; }
+.ocupacion th[scope="row"] { text-align: left; color: var(--ink); font-size: 14px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.ocupacion .celda { width: 100%; min-width: 44px; height: 44px; border-radius: 8px; border: 2px dashed var(--border); background: var(--surface);
+  font-size: 12px; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px; }
+.ocupacion .celda.ocupada { border: 0; background: var(--brand); color: var(--on-brand); }
