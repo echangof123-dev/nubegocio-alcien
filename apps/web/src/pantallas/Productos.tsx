@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, mensajeDe } from "../api";
 import type { Categoria, InfoNegocio, Producto } from "../tipos";
-import { puedeGestionar } from "../tipos";
+import { puedeGestionar, tieneModulo } from "../tipos";
 import { cantidad as fmtCantidad, dinero, parsearNumero } from "../formato";
 import { Aviso, CampoMonto, Cargando, Dialogo } from "../componentes/basicos";
 import { IBuscar, IMas } from "../componentes/iconos";
@@ -53,7 +53,7 @@ export function Productos({ info, avisar }: { info: InfoNegocio; avisar: (t: str
               <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
                 <strong style={{ fontSize: 15 }}>{p.nombre}</strong>
                 <span className="muted" style={{ fontSize: 13 }}>
-                  {p.categoria ?? "Sin categoría"} · {p.unidad}{p.maneja_stock ? ` · stock ${fmtCantidad(p.stock)}` : ""}
+                  {p.categoria ?? "Sin categoría"} · {p.unidad}{p.hijos ? ` · ${p.hijos} variantes · stock ${fmtCantidad(p.stock_variantes ?? 0)}` : p.maneja_stock ? ` · stock ${fmtCantidad(p.stock)}` : ""}
                 </span>
               </span>
               {p.precio === null ? <span className="insignia no">Sin precio</span> : <strong>{dinero(p.precio)}</strong>}
@@ -64,15 +64,20 @@ export function Productos({ info, avisar }: { info: InfoNegocio; avisar: (t: str
       </div>
       {editar && (
         <EditarProducto producto={editar === "nuevo" ? null : editar} categorias={categorias} rol={info.rol} unidadDefecto={info.negocio.unidad_defecto}
+          conVariantes={tieneModulo(info, "M05")} conGarantia={tieneModulo(info, "M23")}
           alCerrar={() => setEditar(null)} alGuardar={() => { setEditar(null); avisar("Guardado"); cargar(); }} />
       )}
     </div>
   );
 }
 
-function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, alGuardar }: {
+function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, alGuardar, conVariantes, conGarantia }: {
   producto: Producto | null; categorias: Categoria[]; rol: InfoNegocio["rol"]; unidadDefecto: string; alCerrar: () => void; alGuardar: () => void;
+  conVariantes: boolean; conGarantia: boolean;
 }) {
+  const [garantia, setGarantia] = useState(producto?.garantia_meses ? String(producto.garantia_meses) : "");
+  const [variantes, setVariantes] = useState(false);
+  const esModelo = (producto?.hijos ?? 0) > 0;
   const [nombre, setNombre] = useState(producto?.nombre ?? "");
   const [precio, setPrecio] = useState(producto?.precio != null ? String(producto.precio).replace(".", ",") : "");
   const [costo, setCosto] = useState(producto?.costo != null ? String(producto.costo).replace(".", ",") : "");
@@ -93,10 +98,11 @@ function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, al
         nombre, unidad, categoria_id: categoria || null, codigo_barras: codigo || null, costo: parsearNumero(costo),
       };
       if (ponePrecio) datos.precio = parsearNumero(precio);
+      if (conGarantia && producto) datos.garantia_meses = garantia ? Number(garantia) : null;
       if (producto) {
         await api("PATCH", `/productos/${producto.id}`, datos);
         const s = parsearNumero(stock);
-        if (producto.maneja_stock && s !== null && s !== producto.stock) await api("POST", `/productos/${producto.id}/stock`, { stock: s, motivo: "Conteo" });
+        if (producto.maneja_stock && !esModelo && s !== null && s !== producto.stock) await api("POST", `/productos/${producto.id}/stock`, { stock: s, motivo: "Conteo" });
       } else {
         await api("POST", "/productos", { ...datos, stock_inicial: parsearNumero(stock) ?? undefined });
       }
@@ -134,14 +140,57 @@ function EditarProducto({ producto, categorias, rol, unidadDefecto, alCerrar, al
           </div>
         </div>
         <div className="opciones">
-          <CampoMonto id="p-stock" etiqueta={producto ? "Stock contado" : "Stock inicial"} valor={stock} alCambiar={setStock} />
+          {esModelo
+            ? <p className="muted" style={{ fontSize: 14 }}>El stock lo llevan sus {producto?.hijos} variantes.</p>
+            : <CampoMonto id="p-stock" etiqueta={producto ? "Stock contado" : "Stock inicial"} valor={stock} alCambiar={setStock} />}
           <div className="campo">
             <label htmlFor="p-codigo">Código de barras</label>
             <input id="p-codigo" className="entrada" inputMode="numeric" maxLength={32} value={codigo} onChange={(e) => setCodigo(e.target.value)} />
           </div>
         </div>
+        {conGarantia && producto && (
+          <div className="campo">
+            <label htmlFor="p-garantia">Garantía en meses (para anotar series al vender)</label>
+            <input id="p-garantia" className="entrada" inputMode="numeric" maxLength={3} value={garantia} onChange={(e) => setGarantia(e.target.value.replace(/\D/g, ""))} />
+          </div>
+        )}
+        {conVariantes && producto && !producto.padre_id && (
+          <button type="button" className="boton secundario" onClick={() => setVariantes(true)}>
+            {esModelo ? "Agregar más tallas o colores" : "Tiene tallas, colores u opciones"}
+          </button>
+        )}
         {error && <Aviso tipo="error">{error}</Aviso>}
         <button className="boton bloque" disabled={ocupado || nombre.trim().length < 1}>{ocupado ? "Guardando…" : "Guardar"}</button>
+      </form>
+      {variantes && producto && <CrearVariantes producto={producto} alCerrar={() => setVariantes(false)} alGuardar={alGuardar} />}
+    </Dialogo>
+  );
+}
+
+function CrearVariantes({ producto, alCerrar, alGuardar }: { producto: Producto; alCerrar: () => void; alGuardar: () => void }) {
+  const [grupos, setGrupos] = useState(["", ""]);
+  const [stock, setStock] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const listas = grupos.map((g) => g.split(",").map((x) => x.trim()).filter(Boolean)).filter((g) => g.length);
+  const combinaciones = listas.reduce((n, g) => n * g.length, listas.length ? 1 : 0);
+  async function guardar(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await api("POST", `/productos/${producto.id}/variantes`, { opciones: listas, stock: parsearNumero(stock) ?? 0 });
+      alGuardar();
+    } catch (err) { setError(mensajeDe(err)); }
+  }
+  return (
+    <Dialogo titulo={`Variantes de ${producto.nombre}`} alCerrar={alCerrar}>
+      <form onSubmit={guardar} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <p className="muted">Cada combinación queda como un producto con su propio stock y código de barras.</p>
+        <div className="campo"><label htmlFor="v-g1">Tallas (separadas por coma)</label>
+          <input id="v-g1" className="entrada" placeholder="S, M, L, XL" value={grupos[0]} onChange={(e) => setGrupos([e.target.value, grupos[1]!])} /></div>
+        <div className="campo"><label htmlFor="v-g2">Colores u otra opción (separadas por coma)</label>
+          <input id="v-g2" className="entrada" placeholder="Negro, Blanco, Azul" value={grupos[1]} onChange={(e) => setGrupos([grupos[0]!, e.target.value])} /></div>
+        <CampoMonto id="v-stock" etiqueta="Stock de cada una (opcional)" valor={stock} alCambiar={setStock} />
+        {error && <Aviso tipo="error">{error}</Aviso>}
+        <button className="boton bloque" disabled={!combinaciones}>Crear {combinaciones} variantes</button>
       </form>
     </Dialogo>
   );

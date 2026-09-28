@@ -39,9 +39,14 @@ export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
     });
 
     const comprobante = c.comprobante === undefined ? "nota" : opcion(c.comprobante, "El comprobante", ["nota", "factura"] as const);
-    const { rows } = await db.query<{ venta_id: string }>(
-      "select * from app.registrar_venta($1::jsonb, $2::jsonb, $3, $4, $5)",
-      [items, pagos, uuidOpcional(c.cliente_id, "El cliente"), comprobante, textoOpcional(c.nota, "La nota", { max: 200 })]);
+    const listaPrecios = uuidOpcional(c.lista_id, "La lista de precios");
+    const { rows } = listaPrecios
+      ? await db.query<{ venta_id: string }>(
+          "select * from app.registrar_venta_lista($1::jsonb, $2::jsonb, $3, $4, $5, $6)",
+          [items, pagos, uuidOpcional(c.cliente_id, "El cliente"), comprobante, textoOpcional(c.nota, "La nota", { max: 200 }), listaPrecios])
+      : await db.query<{ venta_id: string }>(
+          "select * from app.registrar_venta($1::jsonb, $2::jsonb, $3, $4, $5)",
+          [items, pagos, uuidOpcional(c.cliente_id, "El cliente"), comprobante, textoOpcional(c.nota, "La nota", { max: 200 })]);
 
     // Factura: se reserva el número, se arma y se firma en la misma transacción (si algo falla,
     // la venta tampoco se guarda). El envío al SRI va después del COMMIT.
@@ -167,7 +172,7 @@ export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
     const conDeuda = p.query.get("con_deuda") === "1";
     const { rows } = await db.query(
       `select s.cliente_id as id, s.nombre, s.celular, s.limite_credito, s.saldo, s.ultimo_cargo,
-              c.identificacion, c.tipo_identificacion, c.correo, c.direccion
+              c.identificacion, c.tipo_identificacion, c.correo, c.direccion, c.lista_precio_id
        from app.cliente_saldo s join app.cliente c on c.id = s.cliente_id
        where c.activo
          and ($1 = '' or catalogo.normalizar(s.nombre) like '%' || catalogo.normalizar($1) || '%'
@@ -215,14 +220,16 @@ export function rutasVentas(r: Router, dep: { sri: ServicioSri }) {
          correo = coalesce($4, correo),
          tipo_identificacion = coalesce($5, tipo_identificacion),
          identificacion = coalesce($6, identificacion),
-         direccion = coalesce($7, direccion)
+         direccion = coalesce($7, direccion),
+         lista_precio_id = case when $8 then $9::uuid else lista_precio_id end
        where id = $1
-       returning id, nombre, celular, limite_credito, identificacion, tipo_identificacion, correo, direccion`, [
+       returning id, nombre, celular, limite_credito, identificacion, tipo_identificacion, correo, direccion, lista_precio_id`, [
         id,
         textoOpcional(c.nombre, "El nombre", { max: 120 }),
         textoOpcional(c.celular, "El celular", { max: 20 }),
         correo, tipo, identificacion,
         textoOpcional(c.direccion, "La dirección", { max: 300 }),
+        c.lista_precio_id !== undefined, uuidOpcional(c.lista_precio_id, "La lista de precios"),
       ]);
     if (!rows[0]) throw noEncontrado("Cliente no encontrado");
     return { cliente: rows[0] };

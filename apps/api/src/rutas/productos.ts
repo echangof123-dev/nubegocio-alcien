@@ -1,10 +1,13 @@
 import type { Router } from "../http/servidor.js";
-import { noEncontrado, prohibido } from "../http/errores.js";
+import { invalido, noEncontrado, prohibido } from "../http/errores.js";
 import { booleano, numero, numeroOpcional, objeto, texto, textoOpcional, uuid, uuidOpcional } from "../http/validar.js";
 
 const COLUMNAS = `p.id, p.nombre, p.categoria_id, c.nombre as categoria, p.unidad, p.precio, p.costo, p.iva,
   p.codigo_barras, p.maneja_stock, p.stock, p.stock_minimo, p.variantes, p.es_ejemplo, p.activo, p.tipo,
-  exists (select 1 from app.receta r where r.producto_id = p.id) as tiene_receta`;
+  exists (select 1 from app.receta r where r.producto_id = p.id) as tiene_receta,
+  p.padre_id, p.variante, p.garantia_meses,
+  (select count(*)::int from app.producto h where h.padre_id = p.id and h.activo) as hijos,
+  (select coalesce(sum(h.stock), 0) from app.producto h where h.padre_id = p.id and h.activo) as stock_variantes`;
 
 export function rutasProductos(r: Router) {
   r.negocio("GET", "/categorias", async (_p, { db }) => {
@@ -30,6 +33,8 @@ export function rutasProductos(r: Router) {
     const categoria = uuidOpcional(p.query.get("categoria"), "La categoría");
     // Por defecto solo lo que se vende; ?todos=1 incluye los insumos, ?tipo=insumo solo insumos
     const tipo = p.query.get("todos") === "1" ? null : p.query.get("tipo") === "insumo" ? "insumo" : "venta";
+    // Las variantes no se listan sueltas (se eligen desde su modelo), salvo que se pidan o se busquen por código
+    const conVariantes = p.query.get("variantes") === "1";
     const { rows } = await db.query(
       `select ${COLUMNAS}
        from app.producto p left join app.categoria c on c.id = p.categoria_id
@@ -37,8 +42,9 @@ export function rutasProductos(r: Router) {
          and ($1 = '' or catalogo.normalizar(p.nombre) like '%' || catalogo.normalizar($1) || '%' or p.codigo_barras = $1)
          and ($2::uuid is null or p.categoria_id = $2)
          and ($3::text is null or p.tipo = $3)
+         and ($4 or p.padre_id is null or ($1 <> '' and p.codigo_barras = $1))
        order by c.orden nulls last, p.nombre
-       limit 500`, [q, categoria, tipo]);
+       limit 500`, [q, categoria, tipo, conVariantes]);
     return { productos: rows };
   });
 
@@ -98,6 +104,7 @@ export function rutasProductos(r: Router) {
     if (c.stock_minimo !== undefined) campos.push(["stock_minimo", numeroOpcional(c.stock_minimo, "El stock mínimo", { min: 0, decimales: 3 })]);
     if (c.activo !== undefined) campos.push(["activo", booleano(c.activo, "Activo")]);
     if (c.tipo !== undefined) campos.push(["tipo", c.tipo === "insumo" ? "insumo" : "venta"]);
+    if (c.garantia_meses !== undefined) campos.push(["garantia_meses", numeroOpcional(c.garantia_meses, "Los meses de garantía", { min: 0, max: 120, decimales: 0 })]);
 
     if (campos.length) {
       const sets = campos.map(([k], i) => `${k} = $${i + 2}`).join(", ");
@@ -108,6 +115,26 @@ export function rutasProductos(r: Router) {
       `select ${COLUMNAS} from app.producto p left join app.categoria c on c.id = p.categoria_id where p.id = $1`, [id]);
     if (!rows[0]) throw noEncontrado("Producto no encontrado");
     return { producto: rows[0] };
+  });
+
+  r.negocio("GET", "/productos/:id/variantes", async (p, { db }) => {
+    const { rows } = await db.query(
+      `select ${COLUMNAS} from app.producto p left join app.categoria c on c.id = p.categoria_id
+       where p.padre_id = $1 and p.activo order by p.variante`, [uuid(p.params.id, "El producto")]);
+    return { variantes: rows };
+  });
+
+  r.negocio("POST", "/productos/:id/variantes", async (p, { db }) => {
+    const c = objeto(p.cuerpo);
+    if (!Array.isArray(c.opciones) || !c.opciones.length || c.opciones.length > 3) throw invalido("Indica de 1 a 3 grupos de opciones (tallas, colores…)");
+    const opciones = c.opciones.map((g, i) => {
+      if (!Array.isArray(g) || !g.length || g.length > 30) throw invalido(`El grupo ${i + 1} debe tener de 1 a 30 opciones`);
+      return g.map((x) => texto(x, "La opción", { max: 30 }));
+    });
+    const { rows } = await db.query<{ n: number }>("select app.crear_variantes($1, $2::jsonb, $3) as n", [
+      uuid(p.params.id, "El producto"), opciones,
+      numeroOpcional(c.stock, "El stock de cada variante", { min: 0, max: 100_000, decimales: 3 }) ?? 0]);
+    return { status: 201, cuerpo: { creadas: rows[0]!.n } };
   });
 
   r.negocio("POST", "/productos/:id/stock", async (p, { db }) => {

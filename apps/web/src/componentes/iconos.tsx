@@ -41,3 +41,6 @@ export const IMesa = (p: P) => <Icono {...p}><path d="M3 9h18M5 9v11M19 9v11M8 9
 export const IMoto = (p: P) => <Icono {...p}><circle cx="6" cy="17" r="3" /><circle cx="18" cy="17" r="3" /><path d="M9 17h6l-2-6h-4M13 11l2-4h3M6 14l3-3" /></Icono>;
 export const IOlla = (p: P) => <Icono {...p}><path d="M4 10h16v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z" /><path d="M2 10h20M9 6c0-1 1-2 1-3M14 6c0-1 1-2 1-3" /></Icono>;
 export const IReceta = (p: P) => <Icono {...p}><path d="M6 3h12v18H6z" /><path d="M9 7h6M9 11h6M9 15h3" /></Icono>;
+export const IEtiqueta = (p: P) => <Icono {...p}><path d="M3 12V4h8l10 10-8 8z" /><circle cx="7.5" cy="8.5" r="1.5" /></Icono>;
+export const IEscudo = (p: P) => <Icono {...p}><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /><path d="M9 12l2 2 4-4" /></Icono>;
+export const IGlobo = (p: P) => <Icono {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18" /></Icono>;

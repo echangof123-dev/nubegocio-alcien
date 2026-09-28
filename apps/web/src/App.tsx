@@ -22,6 +22,9 @@ import { Cuenta } from "./pantallas/Cuenta";
 import { Cocina } from "./pantallas/Cocina";
 import { Pedidos } from "./pantallas/Pedidos";
 import { Recetas } from "./pantallas/Recetas";
+import { Listas } from "./pantallas/Listas";
+import { Series } from "./pantallas/Series";
+import { CatalogoConfig } from "./pantallas/CatalogoConfig";
 import { PANTALLAS, titulo } from "./modulos";
 
 function useRuta(): [string, (r: string) => void] {
@@ -151,6 +154,9 @@ export function App() {
     case "/cocina": pantalla = <Cocina avisar={avisar} />; break;
     case "/pedidos": pantalla = <Pedidos info={info} avisar={avisar} />; break;
     case "/recetas": pantalla = <Recetas info={info} avisar={avisar} />; break;
+    case "/listas": pantalla = <Listas info={info} avisar={avisar} />; break;
+    case "/series": pantalla = <Series info={info} avisar={avisar} />; break;
+    case "/catalogo": pantalla = <CatalogoConfig info={info} avisar={avisar} />; break;
     case "/reportes":
       pantalla = <Reportes info={info} avisar={avisar} alSalir={salir} navegar={navegar}
         alCambiarNegocio={sesion.negocios.length > 1 ? () => {

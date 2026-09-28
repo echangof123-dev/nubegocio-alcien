@@ -51,6 +51,11 @@ export interface Producto {
   es_ejemplo: boolean;
   tipo?: "venta" | "insumo";
   tiene_receta?: boolean;
+  padre_id?: string | null;
+  variante?: string | null;
+  garantia_meses?: number | null;
+  hijos?: number;
+  stock_variantes?: number;
 }
 
 export interface LineaCarrito { producto: Producto; cantidad: number }
@@ -65,6 +70,7 @@ export interface Cliente {
   tipo_identificacion?: "cedula" | "ruc" | "pasaporte" | null;
   correo?: string | null;
   direccion?: string | null;
+  lista_precio_id?: string | null;
 }
 
 export type EstadoComprobante = "por_firmar" | "firmado" | "recibido" | "autorizado" | "devuelto" | "no_autorizado" | "anulado";

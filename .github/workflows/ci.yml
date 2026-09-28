@@ -85,6 +85,7 @@ jobs:
           sleep 3
           BASE=http://localhost:8080 node e2e/flujo-venta.mjs
           BASE=http://localhost:8080 node e2e/flujo-restaurante.mjs
+          BASE=http://localhost:8080 node e2e/flujo-ropa.mjs
 
       - name: Imagen de Docker en modo producción
         run: |

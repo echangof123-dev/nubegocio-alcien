@@ -12,6 +12,7 @@ import { rutasVentas } from "./rutas/ventas.js";
 import { rutasSri } from "./rutas/sri.js";
 import { rutasCompras } from "./rutas/compras.js";
 import { rutasComida } from "./rutas/comida.js";
+import { rutasRetail } from "./rutas/retail.js";
 import { ServicioSri } from "./sri/servicio.js";
 import { ClienteSriHttp, type ClienteSri } from "./sri/cliente.js";
 
@@ -50,6 +51,7 @@ export function crearApp(cfg: Config, opc: { enviador?: EnviadorCodigos; ia?: Ge
   rutasVentas(router, { sri });
   rutasCompras(router, { pool, sri });
   rutasComida(router, { sri });
+  rutasRetail(router, { pool });
   rutasSri(router, { pool, sri, claveFirmas: cfg.sri.claveFirmas, tokenTareas: cfg.sri.tokenTareas });
 
   const servidor = crearServidor(router, {

@@ -21,9 +21,11 @@ type Props = {
 const NOMBRES: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta", deuna: "DeUna", fiado: "Fiado" };
 
 interface Hecha {
-  numero: number; total: number; vuelto: number; metodo: string; cliente?: Cliente | null;
+  venta_id: string; numero: number; total: number; vuelto: number; metodo: string; cliente?: Cliente | null;
   factura?: { id: string; numero: string } | null;
+  conGarantia: LineaCarrito[];
 }
+interface ListaPrecio { id: string; nombre: string; activa: boolean }
 
 export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
   const metodos = [...info.negocio.metodos_pago, ...(tieneModulo(info, "M14") ? ["fiado"] : [])];
@@ -37,13 +39,31 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
   const [hecha, setHecha] = useState<Hecha | null>(null);
   const [sri, setSri] = useState<TEstadoSri | null>(null);
   const [comprobante, setComprobante] = useState<"nota" | "factura">("nota");
+  const [listas, setListas] = useState<ListaPrecio[]>([]);
+  const [lista, setLista] = useState<string | null>(null);
+  const [preciosLista, setPreciosLista] = useState<Map<string, number | null>>(new Map());
+  const [series, setSeries] = useState(false);
+
+  useEffect(() => {
+    if (!tieneModulo(info, "M17")) return;
+    api<{ listas: ListaPrecio[] }>("GET", "/listas").then((r) => setListas(r.listas.filter((l) => l.activa))).catch(() => {});
+  }, [info]);
+  // El cliente con lista de precios asignada la aplica sola
+  useEffect(() => { if (cliente?.lista_precio_id) setLista(cliente.lista_precio_id); }, [cliente]);
+  useEffect(() => {
+    if (!lista || !carrito.length) { setPreciosLista(new Map()); return; }
+    api<{ precios: { producto_id: string; precio: number | null }[] }>("POST", `/listas/${lista}/cotizar`, {
+      items: carrito.map((l) => ({ producto_id: l.producto.id, cantidad: l.cantidad })),
+    }).then((r) => setPreciosLista(new Map(r.precios.map((x) => [x.producto_id, x.precio])))).catch(() => {});
+  }, [lista, carrito]);
+  const precioDe = (l: LineaCarrito) => (lista ? preciosLista.get(l.producto.id) ?? l.producto.precio : l.producto.precio) ?? 0;
 
   useEffect(() => {
     if (!tieneModulo(info, "M19")) return;
     api<TEstadoSri>("GET", "/sri/config").then(setSri).catch(() => {});
   }, [info]);
 
-  const total = totalCarrito(carrito);
+  const total = lista ? redondear(carrito.reduce((s, l) => s + redondear(l.cantidad * precioDe(l)), 0)) : totalCarrito(carrito);
   const recibidoN = parsearNumero(recibido);
   const vuelto = metodo === "efectivo" && recibidoN !== null ? redondear(recibidoN - total) : null;
   const billetes = [...new Set([Math.ceil(total), 5, 10, 20].filter((b) => b >= total))].sort((a, b) => a - b).slice(0, 4);
@@ -69,13 +89,15 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
       const pago: Record<string, unknown> = { metodo, monto: total };
       if (metodo === "efectivo") pago.recibido = recibidoN ?? total;
       if (referencia.trim() && metodo !== "efectivo" && metodo !== "fiado") pago.referencia = referencia.trim();
-      const r = await api<{ venta: { numero: number; total: number; vuelto: number }; factura: { id: string; numero: string } | null }>("POST", "/ventas", {
+      const r = await api<{ venta: { venta_id: string; numero: number; total: number; vuelto: number }; factura: { id: string; numero: string } | null }>("POST", "/ventas", {
         items: carrito.map((l) => ({ producto_id: l.producto.id, cantidad: l.cantidad })),
         pagos: [pago],
         cliente_id: cliente?.id,
         comprobante,
+        lista_id: lista ?? undefined,
       });
-      setHecha({ ...r.venta, metodo, cliente, factura: r.factura });
+      setHecha({ ...r.venta, metodo, cliente, factura: r.factura,
+        conGarantia: tieneModulo(info, "M23") ? carrito.filter((l) => (l.producto.garantia_meses ?? 0) > 0) : [] });
       setCarrito(() => []);
     } catch (err) {
       setError(mensajeDe(err));
@@ -96,6 +118,10 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
         )}
         {hecha.metodo === "fiado" && <Aviso tipo="info">Quedó anotado en los fiados de {hecha.cliente?.nombre}.</Aviso>}
         {hecha.factura && <FacturaHecha id={hecha.factura.id} negocio={info.negocio.nombre} celular={hecha.cliente?.celular} />}
+        {hecha.conGarantia.length > 0 && (
+          <button className="boton secundario bloque" onClick={() => setSeries(true)}>Anotar series (garantía)</button>
+        )}
+        {series && <AnotarSeries ventaId={hecha.venta_id} lineas={hecha.conGarantia} alCerrar={() => setSeries(false)} />}
         <button className="boton bloque" onClick={() => navegar("/")}>Nueva venta</button>
       </main>
     );
@@ -129,7 +155,7 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
           <div key={l.producto.id} className="linea-carrito">
             <div className="info">
               <strong>{l.producto.nombre}</strong>
-              <span>{fmtCantidad(l.cantidad)} × {dinero(l.producto.precio)} = {dinero(redondear(l.cantidad * (l.producto.precio ?? 0)))}</span>
+              <span>{fmtCantidad(l.cantidad)} × {dinero(precioDe(l))} = {dinero(redondear(l.cantidad * precioDe(l)))}</span>
             </div>
             <div className="cantidad">
               <button type="button" aria-label={`Quitar uno de ${l.producto.nombre}`} onClick={() => cambiar(l.producto.id, l.cantidad <= 1 ? -l.cantidad : -1)}>
@@ -141,6 +167,18 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
           </div>
         ))}
       </div>
+
+      {listas.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span className="etiqueta">Precios</span>
+          <div className="chips" role="group" aria-label="Lista de precios">
+            <button type="button" className={`chip${lista === null ? " activo" : ""}`} aria-pressed={lista === null} onClick={() => setLista(null)}>Normal</button>
+            {listas.map((l) => (
+              <button type="button" key={l.id} className={`chip${lista === l.id ? " activo" : ""}`} aria-pressed={lista === l.id} onClick={() => setLista(l.id)}>{l.nombre}</button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <form onSubmit={cobrar} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -232,6 +270,41 @@ export function Cobrar({ info, carrito, setCarrito, navegar }: Props) {
           alCerrar={() => setElegirCliente(false)} alElegir={(c) => { setCliente(c); setElegirCliente(false); }} />
       )}
     </main>
+  );
+}
+
+function AnotarSeries({ ventaId, lineas, alCerrar }: { ventaId: string; lineas: LineaCarrito[]; alCerrar: () => void }) {
+  const [valores, setValores] = useState<Record<string, string>>({});
+  const [hechas, setHechas] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  async function guardar(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    for (const l of lineas) {
+      for (const serie of (valores[l.producto.id] ?? "").split(/[\s,;]+/).filter(Boolean)) {
+        try {
+          const r = await api<{ serie: { garantia_hasta: string | null } }>("POST", `/ventas/${ventaId}/series`, { producto_id: l.producto.id, serie });
+          setHechas((h) => ({ ...h, [serie]: r.serie.garantia_hasta ?? "" }));
+        } catch (err) { setError(`${serie}: ${mensajeDe(err)}`); return; }
+      }
+    }
+    alCerrar();
+  }
+  return (
+    <Dialogo titulo="Series vendidas" alCerrar={alCerrar}>
+      <form onSubmit={guardar} style={{ display: "flex", flexDirection: "column", gap: 12, textAlign: "left" }}>
+        {lineas.map((l) => (
+          <div key={l.producto.id} className="campo">
+            <label htmlFor={`s-${l.producto.id}`}>{l.producto.nombre} ({l.producto.garantia_meses} meses de garantía)</label>
+            <input id={`s-${l.producto.id}`} className="entrada" placeholder={l.cantidad > 1 ? "Una o varias, separadas por coma" : "Número de serie o IMEI"}
+              value={valores[l.producto.id] ?? ""} onChange={(e) => setValores({ ...valores, [l.producto.id]: e.target.value })} />
+          </div>
+        ))}
+        {Object.keys(hechas).length > 0 && <Aviso tipo="exito">Anotadas: {Object.keys(hechas).join(", ")}</Aviso>}
+        {error && <Aviso tipo="error">{error}</Aviso>}
+        <button className="boton bloque">Guardar series</button>
+      </form>
+    </Dialogo>
   );
 }
 

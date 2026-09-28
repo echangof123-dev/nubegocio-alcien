@@ -25,6 +25,7 @@ export function Vender({ info, carrito, setCarrito, navegar, avisar }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [ponerPrecio, setPonerPrecio] = useState<Producto | null>(null);
   const [pesar, setPesar] = useState<Producto | null>(null);
+  const [elegirVariante, setElegirVariante] = useState<Producto | null>(null);
   const [escanear, setEscanear] = useState(false);
   const porPeso = tieneModulo(info, "M06");
 
@@ -63,6 +64,7 @@ export function Vender({ info, carrito, setCarrito, navegar, avisar }: Props) {
   }
 
   function tocar(p: Producto) {
+    if (p.hijos && p.hijos > 0) { setElegirVariante(p); return; }
     if (p.precio === null) {
       if (puedeGestionar(info.rol)) setPonerPrecio(p);
       else avisar("Pide al dueño que le ponga precio a este producto");
@@ -77,7 +79,12 @@ export function Vender({ info, carrito, setCarrito, navegar, avisar }: Props) {
     const exacto = productos?.find((p) => p.codigo_barras && p.codigo_barras === texto.trim());
     const unico = visibles.length === 1 ? visibles[0] : undefined;
     const p = exacto ?? unico;
-    if (p) { tocar(p); setTexto(""); }
+    if (p) { tocar(p); setTexto(""); return; }
+    // Puede ser el código de una variante (no se listan sueltas)
+    if (/^\d{6,}$/.test(texto.trim())) {
+      api<{ producto: Producto }>("GET", `/productos/codigo/${encodeURIComponent(texto.trim())}`)
+        .then((r) => { tocar(r.producto); setTexto(""); }).catch(() => {});
+    }
   }
 
   function precioPuesto(actualizado: Producto) {
@@ -144,7 +151,7 @@ export function Vender({ info, carrito, setCarrito, navegar, avisar }: Props) {
                   <span className="nombre">{p.nombre}</span>
                   {cant ? <span className="insignia azul">{fmtCantidad(cant)}</span> : null}
                 </span>
-                <span className="unidad">{p.unidad}{bajo ? " · " : ""}{bajo && <span className="stock-bajo">quedan {fmtCantidad(p.stock)}</span>}</span>
+                <span className="unidad">{p.hijos ? `${p.hijos} opciones` : p.unidad}{bajo ? " · " : ""}{bajo && <span className="stock-bajo">quedan {fmtCantidad(p.stock)}</span>}</span>
                 {p.precio === null ? <span className="sin-precio">Poner precio</span> : <span className="precio">{dinero(p.precio)}</span>}
               </button>
             );
@@ -162,6 +169,10 @@ export function Vender({ info, carrito, setCarrito, navegar, avisar }: Props) {
         </div>
       )}
 
+      {elegirVariante && (
+        <DialogoVariantes modelo={elegirVariante} alCerrar={() => setElegirVariante(null)}
+          alElegir={(v) => { setElegirVariante(null); tocar(v); }} />
+      )}
       {ponerPrecio && <DialogoPrecio producto={ponerPrecio} alCerrar={() => setPonerPrecio(null)} alGuardar={precioPuesto} />}
       {pesar && (
         <DialogoPeso producto={pesar} alCerrar={() => setPesar(null)}
@@ -171,10 +182,34 @@ export function Vender({ info, carrito, setCarrito, navegar, avisar }: Props) {
         <DialogoEscanear alCerrar={() => setEscanear(false)} alLeer={(codigo) => {
           setEscanear(false);
           const p = productos.find((x) => x.codigo_barras === codigo);
-          if (p) tocar(p); else avisar(`No hay un producto con el código ${codigo}`);
+          if (p) { tocar(p); return; }
+          api<{ producto: Producto }>("GET", `/productos/codigo/${encodeURIComponent(codigo)}`)
+            .then((r) => tocar(r.producto)).catch(() => avisar(`No hay un producto con el código ${codigo}`));
         }} />
       )}
     </div>
+  );
+}
+
+function DialogoVariantes({ modelo, alCerrar, alElegir }: { modelo: Producto; alCerrar: () => void; alElegir: (v: Producto) => void }) {
+  const [variantes, setVariantes] = useState<Producto[] | null>(null);
+  useEffect(() => {
+    api<{ variantes: Producto[] }>("GET", `/productos/${modelo.id}/variantes`).then((r) => setVariantes(r.variantes)).catch(() => setVariantes([]));
+  }, [modelo.id]);
+  return (
+    <Dialogo titulo={modelo.nombre} alCerrar={alCerrar}>
+      {!variantes ? <Cargando /> : (
+        <div className="rejilla-variantes">
+          {variantes.map((v) => (
+            <button key={v.id} className="variante" disabled={v.maneja_stock && v.stock <= 0} onClick={() => alElegir(v)}>
+              <strong>{v.variante}</strong>
+              <span>{v.precio !== null ? dinero(v.precio) : "Sin precio"}</span>
+              <span className="muted" style={{ fontSize: 12 }}>{v.maneja_stock ? (v.stock > 0 ? `Quedan ${fmtCantidad(v.stock)}` : "Agotado") : ""}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </Dialogo>
   );
 }
 

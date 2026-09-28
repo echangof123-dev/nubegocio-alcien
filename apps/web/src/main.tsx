@@ -1,11 +1,13 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { TiendaPublica } from "./pantallas/TiendaPublica";
 import "./estilos.css";
 
 createRoot(document.getElementById("app")!).render(
   <StrictMode>
-    <App />
+    {/* El catálogo en línea (/t/nombre) lo abren clientes sin cuenta */}
+    {location.pathname.startsWith("/t/") ? <TiendaPublica slug={decodeURIComponent(location.pathname.slice(3))} /> : <App />}
   </StrictMode>,
 );
 

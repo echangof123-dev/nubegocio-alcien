@@ -271,3 +271,16 @@ p { margin: 0; }
 .mesa-tiempo { font-size: 12px; color: var(--ink-muted); }
 .rejilla-cocina { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; align-items: start; }
 .comanda { border-top: 6px solid var(--accent); gap: 10px; }
+
+/* ---------- Variantes ---------- */
+
+.rejilla-variantes { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.variante { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; min-height: 72px; text-align: left;
+  border-radius: var(--radius-md); border: 2px solid var(--border); background: var(--surface); }
+.variante:disabled { opacity: .5; }
+
+/* ---------- Catálogo público ---------- */
+
+.tienda { max-width: 1100px; margin: 0 auto; min-height: 100vh; background: var(--surface-alt); }
+.tienda-cabecera { padding: 24px 16px 8px; display: flex; flex-direction: column; gap: 4px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.tienda .barra-cobro { bottom: 16px; }
